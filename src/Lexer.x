@@ -1,8 +1,9 @@
 {
 module Lexer (scanTokens) where
+import Data.Char (chr)
 }
 
-%wrapper "posn"
+%wrapper "monad"
 
 $ws     = [\t\n\r\ ]
 $digit  = 0-9
@@ -14,33 +15,36 @@ $break  = [\n\r\0]
 @op    = $opchr+
 @num   = $digit+(\.$digit+)?(E[\+\-]?$digit+)?
 @str   = \"[^$break\"]*\"
-@comment = \{.*\}
 
 geomlab :-
-  $ws+ ;
-  @comment ;
+  $ws+     { skip }
+  "{"      { skipComment }
 
-  "#" @ident {\_ (_:id) -> Atom id }
-  "#" @op    {\_ (_:id) -> Atom id }
+  "#" @ident { strTok (Atom . tail) }
+  "#" @op    { strTok (Atom . tail) }
 
-  "[" {\_ _ -> Bra  }
-  "]" {\_ _ -> Ket  }
-  "(" {\_ _ -> LPar }
-  ")" {\_ _ -> RPar }
+  "[" { tok Bra  }
+  "]" { tok Ket  }
+  "(" { tok LPar }
+  ")" { tok RPar }
 
-  "," {\_ _ -> Comma }
-  ";" {\_ _ -> Semi }
-  "|" {\_ _ -> VBar }
+  "," { tok Comma }
+  ";" { tok Semi  }
+  "|" { tok VBar  }
 
-  @ident {\_ id -> Ident id }
-  @op    {\_ id -> Op id }
-  @str   {\_ _  -> Str }
-  @num   {\_ _  -> Num }
+  @ident { strTok Ident }
+  @op    { strTok Op    }
+
+  @str   { tok Str }
+  @num   { tok Num }
+
 {
 type Id = String
 data Token =
   -- Brackets
     Bra | Ket | LPar | RPar
+  -- Control
+  | Eof
   -- Identifiers
   | Ident Id | Op Id
   -- Literals
@@ -49,6 +53,40 @@ data Token =
   | Comma | Semi | VBar
   deriving (Eq, Show)
 
-scanTokens :: String -> [Token]
-scanTokens = alexScanTokens
+data Lexeme = L Token Int Int deriving (Eq, Show)
+
+strTok :: (String -> Token) -> AlexAction Lexeme
+strTok t (pos, _, _, rest) len = return (mkLex token pos)
+  where
+    token = t (take len rest)
+
+tok :: Token -> AlexAction Lexeme
+tok t = strTok (const t)
+
+mkLex :: Token -> AlexPosn -> Lexeme
+mkLex tok (AlexPn _ line col) = L tok line col
+
+skipComment :: AlexAction Lexeme
+skipComment _ _ = alexGetInput >>= go 1
+  where
+    go 0   input = alexSetInput input >> alexMonadScan
+    go lvl input = case alexGetByte input of
+                     Nothing -> alexError "#comment"
+                     Just (b, rest)
+                       | fromByte b == '}' -> go (lvl-1) rest
+                       | fromByte b == '{' -> go (lvl+1) rest
+                       | otherwise         -> go  lvl    rest
+    fromByte     = chr . fromIntegral
+
+alexEOF = return (L Eof 0 0)
+
+scanTokens :: String -> [Lexeme]
+scanTokens input = either error id res
+  where
+    res = runAlex input loop
+    loop = do l@(L tok _ _) <- alexMonadScan
+              if tok == Eof
+              then return []
+              else do rest <- loop
+                      return (l:rest)
 }
