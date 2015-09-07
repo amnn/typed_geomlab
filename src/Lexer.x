@@ -13,8 +13,11 @@ $break  = [\n\r\0]
 
 @ident = [$alpha _][$alpha $digit _]*
 @op    = $opchr+
-@num   = $digit+(\.$digit+)?(E[\+\-]?$digit+)?
-@str   = \"[^$break\"]*\"
+@dec   = $digit+(\.$digit*)?
+@exp   = E[\+\-]?$digit+
+@num   = $digit+(\.$digit*)?(@exp)?
+
+@strbegin = \"[^$break\"]*
 
 geomlab :-
   $ws+     { skip }
@@ -35,9 +38,15 @@ geomlab :-
   @ident { strTok Ident }
   @op    { strTok Op    }
 
-  @str   { tok Str }
-  @num   { tok Num }
+  @num        { tok Num }
+  @strbegin\" { tok Str }
 
+  -- Error cases
+  "}"                     { scanError "#bracematch" }
+  @strbegin               { scanError "#string" }
+  "#"[^$alpha$opchr _]    { scanError "#idop" }
+  @dec"E"[\+\-]?[^$digit] { badToken }
+  .                       { badToken }
 {
 type Id = String
 data Token =
@@ -71,7 +80,7 @@ skipComment _ _ = alexGetInput >>= go 1
   where
     go 0   input = alexSetInput input >> alexMonadScan
     go lvl input = case alexGetByte input of
-                     Nothing -> alexError "#comment"
+                     Nothing -> scanError "#comment" input 0
                      Just (b, rest)
                        | fromByte b == '}' -> go (lvl-1) rest
                        | fromByte b == '{' -> go (lvl+1) rest
@@ -79,6 +88,16 @@ skipComment _ _ = alexGetInput >>= go 1
     fromByte     = chr . fromIntegral
 
 alexEOF = return (L Eof 0 0)
+
+scanError :: String -> AlexAction a
+scanError msg (pos, _, _, str) _ =
+  alexError (concat ["Syntax Error, ", msg, fmtPosn pos])
+  where
+    fmtPosn (AlexPn _ line col) =
+      concat [" at line ", show line, ", column ", show col, "."]
+
+badToken :: AlexAction a
+badToken = scanError "#badtoken"
 
 scanTokens :: String -> [Lexeme]
 scanTokens input = either error id res
