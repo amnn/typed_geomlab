@@ -1,6 +1,7 @@
 {
-module Lexer (scanTokens) where
+module Lexer where
 import Data.Char (chr)
+import qualified Data.HashMap as H
 }
 
 %wrapper "monad"
@@ -35,8 +36,8 @@ geomlab :-
   ";" { tok Semi  }
   "|" { tok VBar  }
 
-  @ident { strTok Ident }
-  @op    { strTok Op    }
+  @ident { ident }
+  @op    { op    }
 
   @num        { tok Num }
   @strbegin\" { tok Str }
@@ -48,6 +49,7 @@ geomlab :-
   @dec"E"[\+\-]?[^$digit] { badToken }
   .                       { badToken }
 {
+
 type Id = String
 data Token =
   -- Brackets
@@ -56,13 +58,77 @@ data Token =
   | Eof
   -- Identifiers
   | Ident Id | Op Id
+  -- Keywords
+  | Define | Else | If | In | Let | Then | When
   -- Literals
   | Atom Id | Num | Str
+  -- Primitive Operators
+  | Anon    {- '_'  -}
+  | AndThen {- '>>' -}
+  -- Numeric Operators
+  | Plus    {- '+' -}
+  | Minus   {- '-' -}
+  | Mul     {- '*' -}
+  | Div     {- '/' -}
+  -- Boolean Operators
+  | And     {- 'and' -}
+  | Neg     {- '~'   -}
+  | Not     {- 'not' -}
+  | Or      {- 'or'  -}
+  -- Relational Operations
+  | Eq      {- '='  -}
+  | GEq     {- '>=' -}
+  | Gt      {- '>'  -}
+  | LEq     {- '<=' -}
+  | Lt      {- '<'  -}
+  | NEq     {- '<>' -}
+  -- List Operators
+  | Cons    {- ':'  -}
+  | Gen     {- '<-' -}
+  | ListCat {- '++' -}
+  | Range   {- '..' -}
+  | StrCat  {- '^'  -}
   -- Punctuation
   | Comma | Semi | VBar
   deriving (Eq, Show)
 
 data Lexeme = L Token Int Int deriving (Eq, Show)
+
+keywords :: H.Map String Token
+keywords = H.fromList [ ("define", Define)
+                      , ("else",   Else)
+                      , ("if",     If)
+                      , ("in",     In)
+                      , ("let",    Let)
+                      , ("then",   Then)
+                      , ("when",   When)
+
+                      , ("_",      Anon)
+                      , (">>",     Then)
+
+                      , ("+",      Plus)
+                      , ("-",      Minus)
+                      , ("*",      Mul)
+                      , ("/",      Div)
+
+                      , ("and",    And)
+                      , ("~",      Neg)
+                      , ("not",    Not)
+                      , ("or",     Or)
+
+                      , ("=",      Eq)
+                      , (">=",     GEq)
+                      , (">",      Gt)
+                      , ("<=",     LEq)
+                      , ("<",      Lt)
+                      , ("<>",     NEq)
+
+                      , (":",      Cons)
+                      , ("<-",     Gen)
+                      , ("++",     ListCat)
+                      , ("..",     Range)
+                      , ("^",      StrCat)
+                      ]
 
 strTok :: (String -> Token) -> AlexAction Lexeme
 strTok t (pos, _, _, rest) len = return (mkLex token pos)
@@ -71,6 +137,18 @@ strTok t (pos, _, _, rest) len = return (mkLex token pos)
 
 tok :: Token -> AlexAction Lexeme
 tok t = strTok (const t)
+
+ident :: AlexAction Lexeme
+ident = strTok $ \id ->
+          case H.lookup id keywords of
+            Just t -> t
+            Nothing -> Ident id
+
+op :: AlexAction Lexeme
+op = strTok $ \id ->
+       case H.lookup id keywords of
+         Just t  -> t
+         Nothing -> Op id
 
 mkLex :: Token -> AlexPosn -> Lexeme
 mkLex tok (AlexPn _ line col) = L tok line col
@@ -108,4 +186,7 @@ scanTokens input = either error id res
               then return []
               else do rest <- loop
                       return (l:rest)
+
+getToken :: (Lexeme -> Alex a) -> Alex a
+getToken = (alexMonadScan >>=)
 }
