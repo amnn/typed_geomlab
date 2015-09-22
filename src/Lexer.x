@@ -39,8 +39,8 @@ geomlab :-
   @ident { ident }
   @op    { op    }
 
-  @num        { tok Num }
-  @strbegin\" { tok Str }
+  @num        { strTok (Num . read) }
+  @strbegin\" { strTok (Str . dequote) }
 
   -- Error cases
   "}"                     { scanError "#bracematch" }
@@ -61,7 +61,9 @@ data Token =
   -- Keywords
   | Define | Else | If | In | Let | Then | When
   -- Literals
-  | Atom Id | Num | Str
+  | Atom Id
+  | Num Double
+  | Str String
   -- Primitive Operators
   | Anon    {- '_'  -}
   | AndThen {- '>>' -}
@@ -129,6 +131,9 @@ keywords = H.fromList [ ("define", Define)
                       , ("..",     Range)
                       , ("^",      StrCat)
                       ]
+
+dequote :: String -> String
+dequote = tail . init
 
 strTok :: (String -> Token) -> AlexAction Lexeme
 strTok t (pos, _, _, rest) len = return (mkLex token pos)
