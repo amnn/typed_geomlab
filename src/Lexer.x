@@ -59,7 +59,7 @@ data Token =
   -- Identifiers
   | Ident Id | Op Id
   -- Keywords
-  | Define | Else | If | In | Let | Then | When
+  | Define | Else | Function | If | In | Let | Then | When
   -- Literals
   | Atom Id
   | Num Double
@@ -97,39 +97,40 @@ data Token =
 data Lexeme = L Token Int Int deriving (Eq, Show)
 
 keywords :: H.Map String Token
-keywords = H.fromList [ ("define", Define)
-                      , ("else",   Else)
-                      , ("if",     If)
-                      , ("in",     In)
-                      , ("let",    Let)
-                      , ("then",   Then)
-                      , ("when",   When)
+keywords = H.fromList [ ("define",   Define)
+                      , ("else",     Else)
+                      , ("function", Function)
+                      , ("if",       If)
+                      , ("in",       In)
+                      , ("let",      Let)
+                      , ("then",     Then)
+                      , ("when",     When)
 
-                      , ("_",      Anon)
-                      , (">>",     Then)
+                      , ("_",        Anon)
+                      , (">>",       Then)
 
-                      , ("+",      Plus)
-                      , ("-",      Minus)
-                      , ("*",      Mul)
-                      , ("/",      Div)
+                      , ("+",        Plus)
+                      , ("-",        Minus)
+                      , ("*",        Mul)
+                      , ("/",        Div)
 
-                      , ("and",    And)
-                      , ("~",      Neg)
-                      , ("not",    Not)
-                      , ("or",     Or)
+                      , ("and",      And)
+                      , ("~",        Neg)
+                      , ("not",      Not)
+                      , ("or",       Or)
 
-                      , ("=",      Eq)
-                      , (">=",     GEq)
-                      , (">",      Gt)
-                      , ("<=",     LEq)
-                      , ("<",      Lt)
-                      , ("<>",     NEq)
+                      , ("=",        Eq)
+                      , (">=",       GEq)
+                      , (">",        Gt)
+                      , ("<=",       LEq)
+                      , ("<",        Lt)
+                      , ("<>",       NEq)
 
-                      , (":",      Cons)
-                      , ("<-",     Gen)
-                      , ("++",     ListCat)
-                      , ("..",     Range)
-                      , ("^",      StrCat)
+                      , (":",        Cons)
+                      , ("<-",       Gen)
+                      , ("++",       ListCat)
+                      , ("..",       Range)
+                      , ("^",        StrCat)
                       ]
 
 dequote :: String -> String

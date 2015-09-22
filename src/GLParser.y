@@ -9,49 +9,50 @@ import Lexer
 %monad     { Alex }
 %tokentype { Lexeme }
 
-%token '('    { L LPar l c }
-       ')'    { L RPar l c }
-       '['    { L Bra l c }
-       ']'    { L Ket l c }
-       ','    { L Comma l c }
-       ';'    { L Semi l c }
-       '|'    { L VBar l c }
-       num    { L (Num   $$) l c }
-       str    { L (Str   $$) l c }
-       atom   { L (Atom  $$) l c }
-       ident  { L (Ident $$) l c }
-       op     { L (Op    $$) l c }
-       define { L Define l c }
-       else   { L Else l c }
-       if     { L If l c }
-       in     { L In l c }
-       let    { L Let l c }
-       then   { L Then l c }
-       when   { L When l c }
-       '_'    { L Anon l c }
-       '>>'   { L AndThen l c }
-       '+'    { L Plus l c }
-       '-'    { L Minus l c }
-       '*'    { L Mul l c }
-       '/'    { L Div l c }
-       and    { L And l c }
-       '~'    { L Neg l c }
-       not    { L Not l c }
-       or     { L Or l c }
-       '='    { L Eq l c }
-       '>='   { L GEq l c }
-       '>'    { L Gt l c }
-       '<='   { L LEq l c }
-       '<'    { L Lt l c }
-       '<>'   { L NEq l c }
-       ':'    { L Cons l c }
-       '<-'   { L Gen l c }
-       '++'   { L ListCat l c }
-       '..'   { L Range l c }
-       '^'    { L StrCat l c }
+%token '('      { L LPar l c }
+       ')'      { L RPar l c }
+       '['      { L Bra l c }
+       ']'      { L Ket l c }
+       ','      { L Comma l c }
+       ';'      { L Semi l c }
+       '|'      { L VBar l c }
+       num      { L (Num   $$) l c }
+       str      { L (Str   $$) l c }
+       atom     { L (Atom  $$) l c }
+       ident    { L (Ident $$) l c }
+       op       { L (Op    $$) l c }
+       define   { L Define l c }
+       function { L Function l c }
+       else     { L Else l c }
+       if       { L If l c }
+       in       { L In l c }
+       let      { L Let l c }
+       then     { L Then l c }
+       when     { L When l c }
+       '_'      { L Anon l c }
+       '>>'     { L AndThen l c }
+       '+'      { L Plus l c }
+       '-'      { L Minus l c }
+       '*'      { L Mul l c }
+       '/'      { L Div l c }
+       and      { L And l c }
+       '~'      { L Neg l c }
+       not      { L Not l c }
+       or       { L Or l c }
+       '='      { L Eq l c }
+       '>='     { L GEq l c }
+       '>'      { L Gt l c }
+       '<='     { L LEq l c }
+       '<'      { L Lt l c }
+       '<>'     { L NEq l c }
+       ':'      { L Cons l c }
+       '<-'     { L Gen l c }
+       '++'     { L ListCat l c }
+       '..'     { L Range l c }
+       '^'      { L StrCat l c }
 
 %%
-
+-- Top Level
 Top ::      { [Para] }
 Top : Paras { reverse $1 }
 
@@ -75,8 +76,43 @@ FnArm ::                                 { FnArm }
 FnArm : ident Formals '=' Expr           { MatchA $1 $2 $4 }
       | ident Formals '=' Expr when Expr { CondA  $1 $2 $4 $6 }
 
-Expr : num { numS $1 }
+-- Expressions
+Expr ::                      { Expr }
+Expr : let Decl in Expr      { declToLet $2 $4 }
+     | function Formals Expr { FnE [MatchA "" $2 $3] }
+     | Cond                  { $1 }
+     | Expr '>>' Cond        { SeqE $1 $3 }
 
+Cond ::                            { Expr }
+Cond : if Expr then Expr else Expr { IfE $2 $4 $6 }
+     | Term                        { $1 }
+
+Term ::       { Expr }
+Term : Factor { $1 }
+     | {- TODO -} { nilS }
+
+Factor ::        { Expr }
+Factor : Primary { $1 }
+       | {- TODO -} { nilS }
+
+Primary ::                      { Expr }
+Primary : num                   { numS $1 }
+        | atom                  { atomS $1 }
+        | str                   { strS $1 }
+        | ident                 { VarE $1 }
+        | ident '(' Actuals ')' { AppE (VarE $1) (reverse $3) }
+        | '[' ListExpr ']'      { $2 }
+        | '(' Expr ')'          { $2 }
+
+Actuals ::                 { [Expr] }
+Actuals : {- empty -}      { [] }
+        | Expr             { [$1] }
+        | Actuals ',' Expr { $3 : $1 }
+
+ListExpr ::           { Expr }
+ListExpr : {- TODO -} { nilS }
+
+-- Pattern DSL
 Formals ::              { [Patt] }
 Formals : '(' Patts ')' { reverse $2 }
 
@@ -167,7 +203,7 @@ data Expr = LitE (Shape Expr)
           | FnE [FnArm]
           | AppE Expr [Expr]
           | LetE Id Expr Expr
-          | SeqE [Expr]
+          | SeqE Expr Expr
             deriving (Eq, Show)
 
 instance HasShape Expr where
