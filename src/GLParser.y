@@ -73,13 +73,13 @@ FnBody : FnArm            { [$1] }
        | FnBody '|' FnArm { $3 : $1 }
 
 FnArm ::                                 { FnArm }
-FnArm : ident Formals '=' Expr           { MatchA $1 $2 $4 }
-      | ident Formals '=' Expr when Expr { CondA  $1 $2 $4 $6 }
+FnArm : ident Formals '=' Expr           { FnArm $1 $2 $4 Nothing }
+      | ident Formals '=' Expr when Expr { FnArm $1 $2 $4 (Just $6) }
 
 -- Expressions
 Expr ::                      { Expr }
 Expr : let Decl in Expr      { declToLet $2 $4 }
-     | function Formals Expr { FnE [MatchA "" $2 $3] }
+     | function Formals Expr { FnE [FnArm "" $2 $3 Nothing] }
      | Cond                  { $1 }
      | Expr '>>' Cond        { SeqE $1 $3 }
 
@@ -109,8 +109,18 @@ Actuals : {- empty -}      { [] }
         | Expr             { [$1] }
         | Actuals ',' Expr { $3 : $1 }
 
-ListExpr ::           { Expr }
-ListExpr : {- TODO -} { nilS }
+ListExpr ::               { Expr }
+ListExpr : Actuals        { enlist $1 }
+         | Expr '..' Expr { RangeE $1 $3 }
+         | Expr '|' Gens  { ListCompE $1 (reverse $3) }
+
+Gens ::             { [GenLvl] }
+Gens : Gen          { [$1] }
+     | Gens ',' Gen { $3 : $1 }
+
+Gen ::                         { GenLvl }
+Gen : Patt '<-' Expr           { GenLvl $1 $3 Nothing }
+    | Patt '<-' Expr when Expr { GenLvl $1 $3 (Just $5) }
 
 -- Pattern DSL
 Formals ::              { [Patt] }
@@ -181,23 +191,28 @@ enlist, enlist1 :: HasShape a => [a] -> a
 enlist  = foldl  (flip consS) nilS
 enlist1 = foldl1 (flip consS)
 
-data Patt  = ValP (Shape Patt)
-           | AnonP
-           | VarP Id
-           | OffsetP Patt Double
-             deriving (Eq, Show)
+data Patt = ValP (Shape Patt)
+          | AnonP
+          | VarP Id
+          | OffsetP Patt Double
+            deriving (Eq, Show)
 
 instance HasShape Patt where
   embedShape = ValP
 
-data FnArm = MatchA Id [Patt] Expr
-           | CondA  Id [Patt] Expr Expr
+data GenLvl = GenLvl Patt Expr (Maybe Expr)
+              deriving (Eq, Show)
+
+data FnArm = FnArm Id [Patt] Expr (Maybe Expr)
              deriving (Eq, Show)
 
 data Decl = Decl Id Expr
             deriving (Eq, Show)
 
+-- TODO: Fix Tokeniser treatment of [1..4] (it eats the '.' and cannot parse it.)
 data Expr = LitE (Shape Expr)
+          | ListCompE Expr [GenLvl]
+          | RangeE Expr Expr
           | VarE Id
           | IfE Expr Expr Expr
           | FnE [FnArm]
@@ -215,8 +230,7 @@ data Para = Def Id Expr
 
 -- TODO: This should validate the funciton (bigger than 1, all names, arities the same, etc)
 fnToDecl :: [FnArm] -> Decl
-fnToDecl body@((MatchA id _ _):_)   = Decl id (FnE body)
-fnToDecl body@((CondA  id _ _ _):_) = Decl id (FnE body)
+fnToDecl body@((FnArm id _ _ _):_) = Decl id (FnE body)
 
 declToDef :: Decl -> Para
 declToDef (Decl id e) = Def id e
