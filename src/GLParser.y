@@ -209,7 +209,6 @@ data FnArm = FnArm Id [Patt] Expr (Maybe Expr)
 data Decl = Decl Id Expr
             deriving (Eq, Show)
 
--- TODO: Fix Tokeniser treatment of [1..4] (it eats the '.' and cannot parse it.)
 data Expr = LitE (Shape Expr)
           | ListCompE Expr [GenLvl]
           | RangeE Expr Expr

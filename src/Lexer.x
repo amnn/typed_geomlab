@@ -14,9 +14,9 @@ $break  = [\n\r\0]
 
 @ident = [$alpha _][$alpha $digit _]*
 @op    = $opchr+
-@dec   = $digit+(\.$digit*)?
+@dec   = $digit+(\.$digit+)?
 @exp   = E[\+\-]?$digit+
-@num   = $digit+(\.$digit*)?(@exp)?
+@num   = $digit+(\.$digit+)?(@exp)?
 
 @strbegin = \"[^$break\"]*
 
