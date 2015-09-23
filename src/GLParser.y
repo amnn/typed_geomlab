@@ -66,7 +66,7 @@ Para : define Decl ';' { declToDef $2 }
 
 Decl ::               { Decl }
 Decl : ident '=' Expr { Decl $1 $3 }
-     | FnBody         { fnToDecl (reverse $1) }
+     | FnBody         {% fnToDecl (reverse $1) }
 
 FnBody ::                 { [FnArm] }
 FnBody : FnArm            { [$1] }
@@ -228,9 +228,17 @@ data Para = Def Id Expr
           | Eval Expr
             deriving (Eq, Show)
 
--- TODO: This should validate the funciton (bigger than 1, all names, arities the same, etc)
-fnToDecl :: [FnArm] -> Decl
-fnToDecl body@((FnArm id _ _ _):_) = Decl id (FnE body)
+-- TODO: Errors should contain positions (line + column)
+fnToDecl :: [FnArm] -> Alex Decl
+fnToDecl body@(a:as)
+  | any (name a /=) (map name as)   = alexError "Parse Error, all function names need to match."
+  | any (arity a /=) (map arity as) = alexError "Parse Error, all arities must match."
+  | otherwise                       = return (Decl (name a) (FnE body))
+  where
+    name  (FnArm id _ _ _) = id
+    arity (FnArm _ fs _ _) = length fs
+
+fnToDecl []     = alexError "Parse Error, Empty function definition."
 
 declToDef :: Decl -> Para
 declToDef (Decl id e) = Def id e
