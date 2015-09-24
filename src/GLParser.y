@@ -1,5 +1,11 @@
 {
 module GLParser where
+
+import Token
+import Shape
+import Expr
+import Patt
+
 import Lexer
 }
 
@@ -162,71 +168,6 @@ ListPatt : {- empty -}       { [] }
          | ListPatt ',' Patt { $3 : $1 }
 
 {
-data Shape a = NumS Double
-             | StrS String
-             | NilS
-             | AtomS Id
-             | ConsS a a
-               deriving (Eq, Show)
-
-class HasShape a where
-  embedShape :: Shape a -> a
-
-numS :: HasShape a => Double -> a
-numS = embedShape . NumS
-
-strS :: HasShape a => String -> a
-strS = embedShape . StrS
-
-nilS :: HasShape a => a
-nilS = embedShape NilS
-
-atomS :: HasShape a => Id -> a
-atomS = embedShape . AtomS
-
-consS :: HasShape a => a -> a -> a
-consS x xs = embedShape (ConsS x xs)
-
-enlist, enlist1 :: HasShape a => [a] -> a
-enlist  = foldl  (flip consS) nilS
-enlist1 = foldl1 (flip consS)
-
-data Patt = ValP (Shape Patt)
-          | AnonP
-          | VarP Id
-          | OffsetP Patt Double
-            deriving (Eq, Show)
-
-instance HasShape Patt where
-  embedShape = ValP
-
-data GenLvl = GenLvl Patt Expr (Maybe Expr)
-              deriving (Eq, Show)
-
-data FnArm = FnArm Id [Patt] Expr (Maybe Expr)
-             deriving (Eq, Show)
-
-data Decl = Decl Id Expr
-            deriving (Eq, Show)
-
-data Expr = LitE (Shape Expr)
-          | ListCompE Expr [GenLvl]
-          | RangeE Expr Expr
-          | VarE Id
-          | IfE Expr Expr Expr
-          | FnE [FnArm]
-          | AppE Expr [Expr]
-          | LetE Id Expr Expr
-          | SeqE Expr Expr
-            deriving (Eq, Show)
-
-instance HasShape Expr where
-  embedShape = LitE
-
-data Para = Def Id Expr
-          | Eval Expr
-            deriving (Eq, Show)
-
 -- TODO: Errors should contain positions (line + column)
 fnToDecl :: [FnArm] -> Alex Decl
 fnToDecl body@(a:as)
@@ -238,12 +179,6 @@ fnToDecl body@(a:as)
     arity (FnArm _ fs _ _) = length fs
 
 fnToDecl []     = alexError "Parse Error, Empty function definition."
-
-declToDef :: Decl -> Para
-declToDef (Decl id e) = Def id e
-
-declToLet :: Decl -> Expr -> Expr
-declToLet (Decl id e) = LetE id e
 
 parseError :: Lexeme -> Alex a
 parseError (L tok l c) = alexError msg
