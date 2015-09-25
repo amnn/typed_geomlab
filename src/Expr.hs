@@ -19,7 +19,10 @@ data Expr = LitE (Shape Expr)
           | VarE Id
           | IfE Expr Expr Expr
           | FnE [FnArm]
-          | AppE Expr [Expr]
+          | AppE Id [Expr]
+          | OpChain [Id] [Expr]
+          | LSectE Id Expr
+          | RSectE Expr Id
           | LetE Id Expr Expr
           | SeqE Expr Expr
             deriving (Eq, Show)
