@@ -26,7 +26,8 @@ import Lexer
        str      { L (Str   $$) l c }
        atom     { L (Atom  $$) l c }
        ident    { L (Ident $$) l c }
-       op       { L (Op    $$) l c }
+       binop    { L (BinOp $$) l c }
+       monop    { L (MonOp $$) l c }
        define   { L Define l c }
        function { L Function l c }
        else     { L Else l c }
@@ -37,25 +38,11 @@ import Lexer
        when     { L When l c }
        '_'      { L Anon l c }
        '>>'     { L AndThen l c }
-       '+'      { L Plus l c }
-       '-'      { L Minus l c }
-       '*'      { L Mul l c }
-       '/'      { L Div l c }
-       and      { L And l c }
-       '~'      { L Neg l c }
-       not      { L Not l c }
-       or       { L Or l c }
-       '='      { L Eq l c }
-       '>='     { L GEq l c }
-       '>'      { L Gt l c }
-       '<='     { L LEq l c }
-       '<'      { L Lt l c }
-       '<>'     { L NEq l c }
-       ':'      { L Cons l c }
        '<-'     { L Gen l c }
-       '++'     { L ListCat l c }
        '..'     { L Range l c }
-       '^'      { L StrCat l c }
+       '+'      { L (BinOp "+") l c }
+       '='      { L (BinOp "=") l c }
+       ':'      { L (BinOp ":") l c }
 
 %%
 -- Top Level

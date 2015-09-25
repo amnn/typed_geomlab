@@ -73,7 +73,7 @@ op :: AlexAction Lexeme
 op = strTok $ \id ->
        case lookupKw id of
          Just t  -> t
-         Nothing -> Op id
+         Nothing -> BinOp id
 
 mkLex :: Token -> AlexPosn -> Lexeme
 mkLex tok (AlexPn _ line col) = L tok line col
