@@ -44,7 +44,7 @@ keywords = H.fromList (keywords ++ binOps ++ monOps)
                , ("when",     When)
 
                , ("_",        Anon)
-               , (">>",       Then)
+               , (">>",       AndThen)
 
                , ("<-",       Gen)
                , ("..",       Range)

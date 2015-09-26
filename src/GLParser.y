@@ -22,6 +22,13 @@ import Lexer
        ','      { L Comma l c }
        ';'      { L Semi l c }
        '|'      { L VBar l c }
+       '_'      { L Anon l c }
+       '>>'     { L AndThen l c }
+       '<-'     { L Gen l c }
+       '..'     { L Range l c }
+       '+'      { L (BinOp "+") l c }
+       '='      { L (BinOp "=") l c }
+       ':'      { L (BinOp ":") l c }
        num      { L (Num   $$) l c }
        str      { L (Str   $$) l c }
        atom     { L (Atom  $$) l c }
@@ -36,13 +43,6 @@ import Lexer
        let      { L Let l c }
        then     { L Then l c }
        when     { L When l c }
-       '_'      { L Anon l c }
-       '>>'     { L AndThen l c }
-       '<-'     { L Gen l c }
-       '..'     { L Range l c }
-       '+'      { L (BinOp "+") l c }
-       '='      { L (BinOp "=") l c }
-       ':'      { L (BinOp ":") l c }
 
 %%
 -- Top Level
@@ -76,19 +76,39 @@ Expr : let Decl in Expr      { declToLet $2 $4 }
      | Cond                  { $1 }
      | Expr '>>' Cond        { SeqE $1 $3 }
 
-Cond ::                            { Expr }
-Cond : if Expr then Expr else Expr { IfE $2 $4 $6 }
-     | Term                        { $1 }
+ExprOrSect ::                      { Expr }
+ExprOrSect : let Decl in Expr      { declToLet $2 $4 }
+           | function Formals Expr { FnE [FnArm "" $2 $3 Nothing] }
+           | CondOrSect            { $1 }
+           | Expr '>>' Cond        { SeqE $1 $3 }
 
-Term ::                { Expr }
-Term : Factor          { $1 }
-     | Factor binop    { RSectE $1 $2 }
-     | OpChain         { mkOpChain $1 }
-     | OpChain binop   { RSectE (mkOpChain $1) $2 }
+Cond ::                            { Expr }
+Cond : Term                        { $1 }
+     | if Cond then Cond else Cond { IfE $2 $4 $6 }
+
+CondOrSect ::                            { Expr }
+CondOrSect : TermOrSect                  { $1 }
+           | if Cond then Cond else Cond { IfE $2 $4 $6 }
+
+Term ::        { Expr }
+Term : Factor  { $1 }
+     | OpChain { mkOpChain $1 }
+
+TermOrSect ::              { Expr }
+TermOrSect : Factor        { $1 }
+           | Factor BinOp  { RSectE $1 $2 }
+           | OpChain       { mkOpChain $1 }
+           | OpChain BinOp { RSectE (mkOpChain $1) $2 }
 
 OpChain ::                     { ([Id], [Expr]) }
-OpChain : Factor binop Factor  { ([$2], [$1, $3]) }
-        | OpChain binop Factor { consChain $1 $2 $3 }
+OpChain : Factor BinOp Factor  { ([$2], [$1, $3]) }
+        | OpChain BinOp Factor { consChain $1 $2 $3 }
+
+BinOp ::      { Id }
+BinOp : '+'   { "+" }
+      | ':'   { ":" }
+      | '='   { "=" }
+      | binop { $1 }
 
 Factor ::             { Expr }
 Factor : Primary      { $1 }
@@ -102,9 +122,9 @@ Primary : num                   { numS $1 }
         | ident '(' Actuals ')' { AppE $1 (reverse $3) }
         | '[' ListExpr ']'      { $2 }
         | '(' monop ')'         { VarE $2 }
-        | '(' binop ')'         { VarE $2 }
-        | '(' binop Term ')'    { LSectE $2 $3 }
-        | '(' Expr ')'          { $2 }
+        | '(' BinOp ')'         { VarE $2 }
+        | '(' BinOp Term ')'    { LSectE $2 $3 }
+        | '(' ExprOrSect ')'    { $2 }
 
 Actuals ::                 { [Expr] }
 Actuals : {- empty -}      { [] }
