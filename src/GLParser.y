@@ -101,7 +101,7 @@ TermOrSect : Factor        { $1 }
            | OpChain BinOp { RSectE (mkOpChain $1) $2 }
 
 OpChain ::                     { ([Id], [Expr]) }
-OpChain : Factor BinOp Factor  { ([$2], [$1, $3]) }
+OpChain : Factor BinOp Factor  { ([$2], [$3, $1]) }
         | OpChain BinOp Factor { consChain $1 $2 $3 }
 
 BinOp ::      { Id }
@@ -185,6 +185,7 @@ ListPatt : {- empty -}       { [] }
 
 {
 -- TODO: Errors should contain positions (line + column)
+-- Function Declaration Validation
 fnToDecl :: [FnArm] -> Alex Decl
 fnToDecl body@(a:as)
   | any (name a /=) (map name as)   = alexError "Parse Error, all function names need to match."
@@ -194,11 +195,48 @@ fnToDecl body@(a:as)
     name  (FnArm id _ _ _) = id
     arity (FnArm _ fs _ _) = length fs
 
-fnToDecl []     = alexError "Parse Error, Empty function definition."
+fnToDecl [] = error "Internal Error, Empty function definition."
 
--- TODO: Remove Op Chain, and produce tree, immediately.
+-- Operator Associativity Parsing
+data Assoc = LeftA  { pri :: Int }
+           | RightA { pri :: Int }
+             deriving (Eq, Show)
+
+data OpTree = Leaf Expr
+            | Op Id OpTree OpTree
+              deriving (Eq, Show)
+
+assoc :: Id -> Assoc
+assoc op
+  | op `elem` ["or"]                            = LeftA  1
+  | op `elem` ["and"]                           = LeftA  2
+  | op `elem` ["=", "<", "<=", "<>", "=>", ">"] = LeftA  3
+  | op `elem` ["++"]                            = RightA 4
+  | op `elem` ["+", "-"]                        = LeftA  5
+  | op `elem` ["^"]                             = LeftA  5
+  | op `elem` ["*", "/"]                        = LeftA  6
+  | op `elem` [":"]                             = RightA 7
+  | otherwise                                   = RightA 0
+
+buildOpTree :: [Id] -> [Expr] -> OpTree
+buildOpTree [] [e] = Leaf e
+buildOpTree _  []  = error "Internal Error, Incomplete operator chain."
+buildOpTree (i:is) (e:es) = fixTop (Op i (Leaf e) (buildOpTree is es))
+  where
+    fixTop t@(Op i _ (Leaf _)) = t
+    fixTop t@(Op i a (Op j b c))
+      | shouldRot (assoc i) (assoc j) = (Op j (Op i a b) c)
+      | otherwise                     = t
+
+    shouldRot (LeftA p)  a = p >= (pri a)
+    shouldRot (RightA p) a = p >  (pri a)
+
+opTreeToExpr :: OpTree -> Expr
+opTreeToExpr (Leaf e)   = e
+opTreeToExpr (Op i l r) = AppE i [opTreeToExpr l, opTreeToExpr r]
+
 mkOpChain :: ([Id], [Expr]) -> Expr
-mkOpChain (is, es) = OpChain (reverse is) (reverse es)
+mkOpChain (is, es) = opTreeToExpr $ buildOpTree (reverse is) (reverse es)
 
 consChain :: ([Id], [Expr]) -> Id -> Expr -> ([Id], [Expr])
 consChain (is, es) i e = (i:is, e:es)
