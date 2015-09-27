@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveFunctor #-}
+
 module Literal where
 
 import Token (Id)
@@ -7,7 +9,7 @@ data LitShape a = NumS Double
                 | NilS
                 | AtomS Id
                 | ConsS a a
-                  deriving (Eq, Show)
+                  deriving (Eq, Show, Functor)
 
 class EmbedsLit a where
   embedLit :: LitShape a -> a

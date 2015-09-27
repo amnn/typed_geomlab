@@ -1,12 +1,12 @@
 {
 module GLParser where
 
-import Token
-import Literal
-import Expr
-import Patt
-
 import Lexer
+import Literal
+import Patt
+import Sugar
+import Token
+
 }
 
 %name        parseExpr Top
