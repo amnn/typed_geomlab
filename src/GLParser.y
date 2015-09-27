@@ -90,19 +90,19 @@ CondOrSect ::                            { Expr }
 CondOrSect : TermOrSect                  { $1 }
            | if Cond then Cond else Cond { IfE $2 $4 $6 }
 
-Term ::        { Expr }
-Term : Factor  { $1 }
-     | OpChain { mkOpChain $1 }
+Term ::       { Expr }
+Term : Factor { $1 }
+     | OpTree { mkOpExpr $1 }
 
-TermOrSect ::              { Expr }
-TermOrSect : Factor        { $1 }
-           | Factor BinOp  { RSectE $1 $2 }
-           | OpChain       { mkOpChain $1 }
-           | OpChain BinOp { RSectE (mkOpChain $1) $2 }
+TermOrSect ::             { Expr }
+TermOrSect : Factor       { $1 }
+           | Factor BinOp { RSectE $1 $2 }
+           | OpTree       { mkOpExpr $1 }
+           | OpTree BinOp { RSectE (mkOpExpr $1) $2 }
 
-OpChain ::                     { ([Id], [Expr]) }
-OpChain : Factor BinOp Factor  { ([$2], [$3, $1]) }
-        | OpChain BinOp Factor { consChain $1 $2 $3 }
+OpTree ::                    { OpTree }
+OpTree : Factor BinOp Factor { Op $2 (Leaf $1) (Leaf $3) }
+       | OpTree BinOp Factor { fixPrec $ Op $2 $1 (Leaf $3) }
 
 BinOp ::      { Id }
 BinOp : '+'   { "+" }
@@ -218,28 +218,18 @@ assoc op
   | op `elem` [":"]                             = RightA 7
   | otherwise                                   = RightA 0
 
-buildOpTree :: [Id] -> [Expr] -> OpTree
-buildOpTree [] [e] = Leaf e
-buildOpTree _  []  = error "Internal Error, Incomplete operator chain."
-buildOpTree (i:is) (e:es) = fixTop (Op i (Leaf e) (buildOpTree is es))
+fixPrec :: OpTree -> OpTree
+fixPrec (Op i (Op j a b) c)
+  | shouldRot (assoc i) (assoc j) = (Op j a (Op i b c))
   where
-    fixTop t@(Op i _ (Leaf _)) = t
-    fixTop t@(Op i a (Op j b c))
-      | shouldRot (assoc i) (assoc j) = (Op j (Op i a b) c)
-      | otherwise                     = t
+    shouldRot (LeftA p)  a = p >  (pri a)
+    shouldRot (RightA p) a = p >= (pri a)
 
-    shouldRot (LeftA p)  a = p >= (pri a)
-    shouldRot (RightA p) a = p >  (pri a)
+fixPrec x = x
 
-opTreeToExpr :: OpTree -> Expr
-opTreeToExpr (Leaf e)   = e
-opTreeToExpr (Op i l r) = AppE i [opTreeToExpr l, opTreeToExpr r]
-
-mkOpChain :: ([Id], [Expr]) -> Expr
-mkOpChain (is, es) = opTreeToExpr $ buildOpTree (reverse is) (reverse es)
-
-consChain :: ([Id], [Expr]) -> Id -> Expr -> ([Id], [Expr])
-consChain (is, es) i e = (i:is, e:es)
+mkOpExpr :: OpTree -> Expr
+mkOpExpr (Leaf e)   = e
+mkOpExpr (Op i l r) = AppE i [mkOpExpr l, mkOpExpr r]
 
 parseError :: Lexeme -> Alex a
 parseError (L tok l c) = alexError msg
