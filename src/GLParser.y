@@ -71,16 +71,16 @@ FnArm : ident Formals '=' Expr           { FnArm $1 $2 $4 Nothing }
 
 -- Expressions
 Expr ::                      { Sugar }
-Expr : let Decl in Expr      { declToLet $2 $4 }
+Expr : Cond                  { $1 }
+     | let Decl in Expr      { declToLet $2 $4 }
      | function Formals Expr { FnS [FnArm "" $2 $3 Nothing] }
-     | Cond                  { $1 }
-     | Expr '>>' Cond        { SeqS $1 $3 }
+     | Cond '>>' Expr        { SeqS $1 $3 }
 
 ExprOrSect ::                      { Sugar }
 ExprOrSect : let Decl in Expr      { declToLet $2 $4 }
            | function Formals Expr { FnS [FnArm "" $2 $3 Nothing] }
            | CondOrSect            { $1 }
-           | Expr '>>' Cond        { SeqS $1 $3 }
+           | Cond '>>' Expr        { SeqS $1 $3 }
 
 Cond ::                            { Sugar }
 Cond : Term                        { $1 }
@@ -153,13 +153,9 @@ Patts : {- empty -}    { [] }
       | Patt           { [$1] }
       | Patts ',' Patt { $3 : $1 }
 
-Patt ::                  { Patt }
-Patt : PattFactor        { $1 }
-     | Patt '+' NumChain { OffsetP $1 $3 }
-
-NumChain ::                 { Double }
-NumChain : num              { $1 }
-         | NumChain '+' num { $1 + $3 }
+Patt ::             { Patt }
+Patt : PattFactor   { $1 }
+     | Patt '+' num { OffsetP $1 $3 }
 
 PattFactor ::                          { Patt }
 PattFactor : PattPrim                  { $1 }
