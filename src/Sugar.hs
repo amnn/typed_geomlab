@@ -63,11 +63,11 @@ instance Foldable Sugar where
   project (LitS s)         = LitSB s
   project (ListCompS s gs) = ListCompSB s gs
   project (RangeS from to) = RangeSB from to
-  project (VarS i)         = VarSB i
+  project (VarS x)         = VarSB x
   project (IfS c t e)      = IfSB c t e
   project (FnS arms)       = FnSB arms
   project (AppS f xs)      = AppSB f xs
   project (LSectS f x)     = LSectSB f x
   project (RSectS x f)     = RSectSB x f
-  project (LetS x e es)    = LetSB x e es
-  project (SeqS x y)       = SeqSB x y
+  project (LetS x a b)     = LetSB x a b
+  project (SeqS a b)       = SeqSB a b
