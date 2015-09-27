@@ -2,7 +2,7 @@
 module GLParser where
 
 import Token
-import Shape
+import Literal
 import Expr
 import Patt
 

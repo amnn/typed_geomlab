@@ -1,13 +1,13 @@
 module Patt where
 
+import Literal
 import Token (Id)
-import Shape
 
-data Patt = ValP (Shape Patt)
+data Patt = ValP (LitShape Patt)
           | AnonP
           | VarP Id
           | OffsetP Patt Double
             deriving (Eq, Show)
 
-instance HasShape Patt where
-  embedShape = ValP
+instance EmbedsLit Patt where
+  embedLit = ValP
