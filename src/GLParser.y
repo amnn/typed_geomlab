@@ -46,14 +46,14 @@ import Lexer
 
 %%
 -- Top Level
-Top ::      { [Para] }
+Top ::      { [Para Sugar] }
 Top : Paras { reverse $1 }
 
-Paras ::            { [Para] }
+Paras ::            { [Para Sugar] }
 Paras : Para        { [$1] }
       | Paras Para  { $2 : $1 }
 
-Para ::                { Para }
+Para ::                { Para Sugar }
 Para : define Decl ';' { declToDef $2 }
      | Expr ';'        { Eval $1 }
 
@@ -70,35 +70,35 @@ FnArm : ident Formals '=' Expr           { FnArm $1 $2 $4 Nothing }
       | ident Formals '=' Expr when Expr { FnArm $1 $2 $4 (Just $6) }
 
 -- Expressions
-Expr ::                      { Expr }
+Expr ::                      { Sugar }
 Expr : let Decl in Expr      { declToLet $2 $4 }
-     | function Formals Expr { FnE [FnArm "" $2 $3 Nothing] }
+     | function Formals Expr { FnS [FnArm "" $2 $3 Nothing] }
      | Cond                  { $1 }
-     | Expr '>>' Cond        { SeqE $1 $3 }
+     | Expr '>>' Cond        { SeqS $1 $3 }
 
-ExprOrSect ::                      { Expr }
+ExprOrSect ::                      { Sugar }
 ExprOrSect : let Decl in Expr      { declToLet $2 $4 }
-           | function Formals Expr { FnE [FnArm "" $2 $3 Nothing] }
+           | function Formals Expr { FnS [FnArm "" $2 $3 Nothing] }
            | CondOrSect            { $1 }
-           | Expr '>>' Cond        { SeqE $1 $3 }
+           | Expr '>>' Cond        { SeqS $1 $3 }
 
-Cond ::                            { Expr }
+Cond ::                            { Sugar }
 Cond : Term                        { $1 }
-     | if Cond then Cond else Cond { IfE $2 $4 $6 }
+     | if Cond then Cond else Cond { IfS $2 $4 $6 }
 
-CondOrSect ::                            { Expr }
+CondOrSect ::                            { Sugar }
 CondOrSect : TermOrSect                  { $1 }
-           | if Cond then Cond else Cond { IfE $2 $4 $6 }
+           | if Cond then Cond else Cond { IfS $2 $4 $6 }
 
-Term ::       { Expr }
+Term ::       { Sugar }
 Term : Factor { $1 }
      | OpTree { mkOpExpr $1 }
 
-TermOrSect ::             { Expr }
+TermOrSect ::             { Sugar }
 TermOrSect : Factor       { $1 }
-           | Factor BinOp { RSectE $1 $2 }
+           | Factor BinOp { RSectS $1 $2 }
            | OpTree       { mkOpExpr $1 }
-           | OpTree BinOp { RSectE (mkOpExpr $1) $2 }
+           | OpTree BinOp { RSectS (mkOpExpr $1) $2 }
 
 OpTree ::                    { OpTree }
 OpTree : Factor BinOp Factor { Op $2 (Leaf $1) (Leaf $3) }
@@ -110,31 +110,31 @@ BinOp : '+'   { "+" }
       | '='   { "=" }
       | binop { $1 }
 
-Factor ::             { Expr }
+Factor ::             { Sugar }
 Factor : Primary      { $1 }
-       | monop Factor { AppE $1 [$2] }
+       | monop Factor { AppS $1 [$2] }
 
-Primary ::                      { Expr }
+Primary ::                      { Sugar }
 Primary : num                   { numS $1 }
         | atom                  { atomS $1 }
         | str                   { strS $1 }
-        | ident                 { VarE $1 }
-        | ident '(' Actuals ')' { AppE $1 (reverse $3) }
+        | ident                 { VarS $1 }
+        | ident '(' Actuals ')' { AppS $1 (reverse $3) }
         | '[' ListExpr ']'      { $2 }
-        | '(' monop ')'         { VarE $2 }
-        | '(' BinOp ')'         { VarE $2 }
-        | '(' BinOp Term ')'    { LSectE $2 $3 }
+        | '(' monop ')'         { VarS $2 }
+        | '(' BinOp ')'         { VarS $2 }
+        | '(' BinOp Term ')'    { LSectS $2 $3 }
         | '(' ExprOrSect ')'    { $2 }
 
-Actuals ::                 { [Expr] }
+Actuals ::                 { [Sugar] }
 Actuals : {- empty -}      { [] }
         | Expr             { [$1] }
         | Actuals ',' Expr { $3 : $1 }
 
-ListExpr ::               { Expr }
+ListExpr ::               { Sugar }
 ListExpr : Actuals        { enlist $1 }
-         | Expr '..' Expr { RangeE $1 $3 }
-         | Expr '|' Gens  { ListCompE $1 (reverse $3) }
+         | Expr '..' Expr { RangeS $1 $3 }
+         | Expr '|' Gens  { ListCompS $1 (reverse $3) }
 
 Gens ::             { [GenLvl] }
 Gens : Gen          { [$1] }
@@ -190,7 +190,7 @@ fnToDecl :: [FnArm] -> Alex Decl
 fnToDecl body@(a:as)
   | any (name a /=) (map name as)   = alexError "Parse Error, all function names need to match."
   | any (arity a /=) (map arity as) = alexError "Parse Error, all arities must match."
-  | otherwise                       = return (Decl (name a) (FnE body))
+  | otherwise                       = return (Decl (name a) (FnS body))
   where
     name  (FnArm id _ _ _) = id
     arity (FnArm _ fs _ _) = length fs
@@ -202,7 +202,7 @@ data Assoc = LeftA  { pri :: Int }
            | RightA { pri :: Int }
              deriving (Eq, Show)
 
-data OpTree = Leaf Expr
+data OpTree = Leaf Sugar
             | Op Id OpTree OpTree
               deriving (Eq, Show)
 
@@ -227,9 +227,9 @@ fixPrec (Op i (Op j a b) c)
 
 fixPrec x = x
 
-mkOpExpr :: OpTree -> Expr
+mkOpExpr :: OpTree -> Sugar
 mkOpExpr (Leaf e)   = e
-mkOpExpr (Op i l r) = AppE i [mkOpExpr l, mkOpExpr r]
+mkOpExpr (Op i l r) = AppS i [mkOpExpr l, mkOpExpr r]
 
 parseError :: Lexeme -> Alex a
 parseError (L tok l c) = alexError msg
@@ -237,6 +237,6 @@ parseError (L tok l c) = alexError msg
     msg = concat ["Parse Error, near ", show tok
                  , " at line ", show l, ", column ", show c, "."]
 
-parse :: String -> [Para]
+parse :: String -> [Para Sugar]
 parse input = either error id (runAlex input parseExpr)
 }
