@@ -206,7 +206,7 @@ assoc :: Id -> Assoc
 assoc op
   | op `elem` ["or"]                            = LeftA  1
   | op `elem` ["and"]                           = LeftA  2
-  | op `elem` ["=", "<", "<=", "<>", "=>", ">"] = LeftA  3
+  | op `elem` ["=", "<", "<=", "<>", ">=", ">"] = LeftA  3
   | op `elem` ["++"]                            = RightA 4
   | op `elem` ["+", "-"]                        = LeftA  5
   | op `elem` ["^"]                             = LeftA  5
