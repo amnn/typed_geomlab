@@ -47,7 +47,7 @@ data SugarB a = LitSB (LitShape a)
                 deriving (Eq, Show, Functor)
 
 data Para a = Def Id a | Eval a
-              deriving (Eq, Show)
+              deriving (Eq, Show, Functor)
 
 instance EmbedsLit Sugar where
   embedLit = LitS

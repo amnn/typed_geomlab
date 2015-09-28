@@ -12,7 +12,7 @@ data Expr = LitE (LitShape Expr)
           | VarE Id
           | IfE Expr Expr Expr
           | FnE [Id] Expr
-          | AppE Id [Expr]
+          | AppE Expr [Expr]
           | LetE Id Expr Expr
           | SeqE Expr Expr
             deriving (Eq, Show)
@@ -21,7 +21,7 @@ data ExprB a = LitEB (LitShape a)
              | VarEB Id
              | IfEB a a a
              | FnEB [Id] a
-             | AppEB Id [a]
+             | AppEB a [a]
              | LetEB Id a a
              | SeqEB a a
                deriving (Eq, Show, Functor)
