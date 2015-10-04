@@ -115,9 +115,9 @@ Factor : Primary      { $1 }
        | monop Factor { AppS $1 [$2] }
 
 Primary ::                      { Sugar }
-Primary : num                   { numS $1 }
-        | atom                  { atomS $1 }
-        | str                   { strS $1 }
+Primary : num                   { numB $1 }
+        | atom                  { atomB $1 }
+        | str                   { strB $1 }
         | ident                 { VarS $1 }
         | ident '(' Actuals ')' { AppS $1 (reverse $3) }
         | '[' ListExpr ']'      { $2 }
@@ -136,13 +136,10 @@ ListExpr : Actuals        { enlist $1 }
          | Expr '..' Expr { RangeS $1 $3 }
          | Expr '|' Gens  { ListCompS $1 (reverse $3) }
 
-Gens ::             { [GenLvl] }
-Gens : Gen          { [$1] }
-     | Gens ',' Gen { $3 : $1 }
-
-Gen ::                         { GenLvl }
-Gen : Patt '<-' Expr           { GenLvl $1 $3 Nothing }
-    | Patt '<-' Expr when Expr { GenLvl $1 $3 (Just $5) }
+Gens ::                        { [Gen] }
+Gens : Patt '<-' Expr          { [GenB $1 $3] }
+     | Gens ',' Patt '<-' Expr { GenB $3 $5 : $1 }
+     | Gens when Expr          { FilterB $3 : $1 }
 
 -- Pattern DSL
 Formals ::              { [Patt] }
@@ -167,10 +164,10 @@ PattPrimCons : PattPrim                  { [$1] }
 
 PattPrim ::                 { Patt }
 PattPrim : ident            { VarP $1 }
-         | atom             { atomS $1 }
+         | atom             { atomB $1 }
          | '_'              { AnonP }
-         | num              { numS $1 }
-         | str              { strS $1 }
+         | num              { numB $1 }
+         | str              { strB $1 }
          | '(' Patt ')'     { $2 }
          | '[' ListPatt ']' { enlist $2 }
 
@@ -232,7 +229,4 @@ parseError (L tok l c) = alexError msg
   where
     msg = concat ["Parse Error, near ", show tok
                  , " at line ", show l, ", column ", show c, "."]
-
-parse :: String -> [Para Sugar]
-parse input = either error id (runAlex input parseExpr)
 }

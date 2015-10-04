@@ -6,7 +6,7 @@ import Data.Char (chr)
 import Token
 }
 
-%wrapper "monad"
+%wrapper "monadUserState"
 
 $ws     = [\t\n\r\ ]
 $digit  = 0-9
@@ -51,6 +51,19 @@ geomlab :-
   @dec"E"[\+\-]?[^$digit] { badToken }
   .                       { badToken }
 {
+
+data AlexUserState = AlexUserState { syms :: Int }
+
+alexInitUserState :: AlexUserState
+alexInitUserState = AlexUserState { syms = 0 }
+
+incSym :: Alex Int
+incSym = Alex $ \s@AlexState{alex_ust=ust} ->
+           let x = syms ust in
+               Right (s{alex_ust = ust{syms = x + 1}}, x)
+
+genSym :: Alex Id
+genSym = ("var" ++) . show <$> incSym
 
 dequote :: String -> String
 dequote = tail . init
@@ -101,16 +114,6 @@ scanError msg (pos, _, _, str) _ =
 
 badToken :: AlexAction a
 badToken = scanError "#badtoken"
-
-scanTokens :: String -> [Lexeme]
-scanTokens input = either error id res
-  where
-    res = runAlex input loop
-    loop = do l@(L tok _ _) <- alexMonadScan
-              if tok == Eof
-              then return []
-              else do rest <- loop
-                      return (l:rest)
 
 getToken :: (Lexeme -> Alex a) -> Alex a
 getToken = (alexMonadScan >>=)

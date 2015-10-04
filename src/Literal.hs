@@ -1,34 +1,39 @@
-{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
 
 module Literal where
 
 import Token (Id)
 
-data LitShape a = NumS Double
-                | StrS String
-                | NilS
-                | AtomS Id
-                | ConsS a a
-                  deriving (Eq, Show, Functor)
+data LitB a = NumB Double
+            | StrB String
+            | NilB
+            | AtomB Id
+            | ConsB a a
+              deriving ( Eq
+                       , Show
+                       , Functor
+                       , Foldable
+                       , Traversable
+                       )
 
 class EmbedsLit a where
-  embedLit :: LitShape a -> a
+  embedLit :: LitB a -> a
 
-numS :: EmbedsLit a => Double -> a
-numS = embedLit . NumS
+numB :: EmbedsLit a => Double -> a
+numB = embedLit . NumB
 
-strS :: EmbedsLit a => String -> a
-strS = embedLit . StrS
+strB :: EmbedsLit a => String -> a
+strB = embedLit . StrB
 
-nilS :: EmbedsLit a => a
-nilS = embedLit NilS
+nilB :: EmbedsLit a => a
+nilB = embedLit NilB
 
-atomS :: EmbedsLit a => Id -> a
-atomS = embedLit . AtomS
+atomB :: EmbedsLit a => Id -> a
+atomB = embedLit . AtomB
 
-consS :: EmbedsLit a => a -> a -> a
-consS x xs = embedLit (ConsS x xs)
+consB :: EmbedsLit a => a -> a -> a
+consB x xs = embedLit (ConsB x xs)
 
 enlist, enlist1 :: EmbedsLit a => [a] -> a
-enlist  = foldl  (flip consS) nilS
-enlist1 = foldl1 (flip consS)
+enlist  = foldl  (flip consB) nilB
+enlist1 = foldl1 (flip consB)

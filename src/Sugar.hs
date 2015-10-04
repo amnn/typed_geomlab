@@ -1,27 +1,22 @@
-{-# LANGUAGE TypeFamilies, DeriveFunctor #-}
+{-# LANGUAGE TypeFamilies, DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
 
 module Sugar where
 
 import Prelude hiding (Foldable)
+import qualified Prelude as P (Foldable)
 import Data.Functor.Foldable
 import Literal
 import Patt
 import Token (Id)
 
-data GenLvlShape a = GenLvl Patt a (Maybe a)
-                     deriving (Eq, Show, Functor)
-
-data FnArmShape a = FnArm Id [Patt] a (Maybe a)
-                    deriving (Eq, Show, Functor)
-
-type GenLvl = GenLvlShape Sugar
-type FnArm  = FnArmShape Sugar
+type Gen   = GenB Sugar
+type FnArm = FnArmB Sugar
 
 data Decl = Decl Id Sugar
             deriving (Eq, Show)
 
-data Sugar = LitS (LitShape Sugar)
-           | ListCompS Sugar [GenLvl]
+data Sugar = LitS (LitB Sugar)
+           | ListCompS Sugar [Gen]
            | RangeS Sugar Sugar
            | VarS Id
            | IfS Sugar Sugar Sugar
@@ -33,12 +28,12 @@ data Sugar = LitS (LitShape Sugar)
            | SeqS Sugar Sugar
              deriving (Eq, Show)
 
-data SugarB a = LitSB (LitShape a)
-              | ListCompSB a [GenLvlShape a]
+data SugarB a = LitSB (LitB a)
+              | ListCompSB a [GenB a]
               | RangeSB a a
               | VarSB Id
               | IfSB a a a
-              | FnSB [FnArmShape a]
+              | FnSB [FnArmB a]
               | AppSB Id [a]
               | LSectSB Id a
               | RSectSB a Id
@@ -47,7 +42,11 @@ data SugarB a = LitSB (LitShape a)
                 deriving (Eq, Show, Functor)
 
 data Para a = Def Id a | Eval a
-              deriving (Eq, Show, Functor)
+              deriving (Eq
+                       , Show
+                       , Functor
+                       , P.Foldable
+                       , Traversable)
 
 instance EmbedsLit Sugar where
   embedLit = LitS
