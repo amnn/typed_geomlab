@@ -226,8 +226,7 @@ mkOpExpr (Leaf e)   = e
 mkOpExpr (Op i l r) = AppS i [mkOpExpr l, mkOpExpr r]
 
 parseError :: Lexeme -> Alex a
-parseError (L tok l c) = alexError msg
+parseError l = alexError msg
   where
-    msg = concat ["Parse Error, near ", show tok
-                 , " at line ", show l, ", column ", show c, "."]
+    msg = concat ["Parse Error, near ", show l]
 }

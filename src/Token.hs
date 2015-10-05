@@ -15,41 +15,64 @@ data Token =
   -- Keywords
   | Define | Else | Function | If | In | Let | Then | When
   -- Punctuation
-  | AndThen {- '>>' -}
-  | Anon    {- '_'  -}
-  | Gen     {- '<-' -}
-  | Range   {- '..' -}
+  | AndThen
+  | Anon
+  | Gen
+  | Range
   -- Punctuation
-  | Comma   {- ','  -}
-  | Semi    {- ';'  -}
-  | VBar    {- '|'  -}
+  | Comma
+  | Semi
+  | VBar
   -- Literals
   | Atom Id
   | Num Double
   | Str String
-  deriving (Eq, Show)
+  deriving Eq
 
-data Lexeme = L Token Int Int deriving (Eq, Show)
+data Lexeme = L Token Int Int deriving Eq
+
+instance Show Token where
+  show Bra       = "["
+  show Ket       = "]"
+  show LPar      = "("
+  show RPar      = ")"
+  show Eof       = "\0"
+  show (Ident x) = x
+  show (BinOp x) = x
+  show (MonOp x) = x
+  show Define    = "define"
+  show Else      = "else"
+  show Function  = "function"
+  show If        = "if"
+  show In        = "in"
+  show Let       = "let"
+  show Then      = "then"
+  show When      = "when"
+  show AndThen   = ">>"
+  show Anon      = "_"
+  show Gen       = "<-"
+  show Range     = ".."
+  show Comma     = ","
+  show Semi      = ";"
+  show VBar      = "|"
+  show (Atom x)  = "#" ++ x
+  show (Num n)   = show n
+  show (Str s)   = show s
+
+instance Show Lexeme where
+  show (L t l c) = concat [show t, " at line ", show l, ", column ", show c]
 
 keywords :: H.Map String Token
 keywords = H.fromList (keywords ++ binOps ++ monOps)
   where
-    keywords = [ ("define",   Define)
-               , ("else",     Else)
-               , ("function", Function)
-               , ("if",       If)
-               , ("in",       In)
-               , ("let",      Let)
-               , ("then",     Then)
-               , ("when",     When)
-
-               , ("_",        Anon)
-               , (">>",       AndThen)
-
-               , ("<-",       Gen)
-               , ("..",       Range)
-               ]
+    unwrap kw    = (show kw, kw)
     wrap ctr str = (str, ctr str)
+    keywords = map unwrap
+               [ Define, Else, Function, If
+               , In, Let, Then, When
+               , Anon, AndThen
+               , Gen, Range
+               ]
     binOps = map (wrap BinOp)
              [ "+", "-", "*", "/"
              , "and", "or"
