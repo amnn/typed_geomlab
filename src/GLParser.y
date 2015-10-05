@@ -168,6 +168,7 @@ PattPrim : ident            { VarP $1 }
          | '_'              { AnonP }
          | num              { numB $1 }
          | str              { strB $1 }
+         | ident Formals    { CtrP $1 $2 }
          | '(' Patt ')'     { $2 }
          | '[' ListPatt ']' { enlist $2 }
 
