@@ -62,6 +62,39 @@ instance Show Token where
 instance Show Lexeme where
   show (L t l c) = concat [show t, " at line ", show l, ", column ", show c]
 
+data Assoc = LeftA  { pri :: Int }
+           | RightA { pri :: Int }
+             deriving (Eq, Show)
+
+data OpTree a = Leaf a
+              | Op Id (OpTree a) (OpTree a)
+                deriving (Eq, Show)
+
+assoc :: Id -> Assoc
+assoc op
+  | op `elem` ["or"]                            = LeftA  1
+  | op `elem` ["and"]                           = LeftA  2
+  | op `elem` ["=", "<", "<=", "<>", ">=", ">"] = LeftA  3
+  | op `elem` ["++"]                            = RightA 4
+  | op `elem` ["+", "-"]                        = LeftA  5
+  | op `elem` ["^"]                             = LeftA  5
+  | op `elem` ["."]                             = LeftA  5
+  | op `elem` ["&"]                             = LeftA  5
+  | op `elem` ["$"]                             = LeftA  6
+  | op `elem` ["*", "/"]                        = LeftA  6
+  | op `elem` ["div", "mod"]                    = LeftA  6
+  | op `elem` [":"]                             = RightA 7
+  | otherwise                                   = RightA 0
+
+fixPrec :: OpTree a -> OpTree a
+fixPrec (Op i (Op j a b) c)
+  | shouldRot (assoc i) (assoc j) = (Op j a (Op i b c))
+  where
+    shouldRot (LeftA p)  a = p >  (pri a)
+    shouldRot (RightA p) a = p >= (pri a)
+
+fixPrec x = x
+
 keywords :: H.Map String Token
 keywords = H.fromList (keywords ++ binOps ++ monOps)
   where
@@ -76,8 +109,11 @@ keywords = H.fromList (keywords ++ binOps ++ monOps)
     binOps = map (wrap BinOp)
              [ "+", "-", "*", "/"
              , "and", "or"
+             , "div", "mod"
              , "=", ">=", ">", "<=", "<", "<>"
              , ":", "++", "^"
+             , "."
+             , "$", "&"
              ]
     monOps = map (wrap MonOp)
              [ "~"

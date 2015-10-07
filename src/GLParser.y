@@ -27,6 +27,7 @@ import Token
        '<-'     { L Gen l c }
        '..'     { L Range l c }
        '+'      { L (BinOp "+") l c }
+       '-'      { L (BinOp "-") l c }
        '='      { L (BinOp "=") l c }
        ':'      { L (BinOp ":") l c }
        num      { L (Num   $$) l c }
@@ -58,16 +59,26 @@ Para : define Decl ';' { declToDef $2 }
      | Expr ';'        { Eval $1 }
 
 Decl ::               { Decl }
-Decl : ident '=' Expr { Decl $1 $3 }
+Decl : Id '=' Expr { Decl $1 $3 }
      | FnBody         {% fnToDecl (reverse $1) }
 
 FnBody ::                 { [FnArm] }
 FnBody : FnArm            { [$1] }
        | FnBody '|' FnArm { $3 : $1 }
 
-FnArm ::                                 { FnArm }
-FnArm : ident Formals '=' Expr           { FnArm $1 $2 $4 Nothing }
-      | ident Formals '=' Expr when Expr { FnArm $1 $2 $4 (Just $6) }
+FnArm ::                          { FnArm }
+FnArm : FnLhs '=' Expr           { mkFnArm $1 $3 Nothing }
+      | FnLhs '=' Expr when Expr { mkFnArm $1 $3 (Just $5) }
+
+FnLhs :: { (Id, [Patt]) }
+FnLhs : monop '(' Patt ')'          { ($1, [$3]) }
+      | binop '(' Patt ',' Patt ')' { ($1, [$3, $5]) }
+      | ident Formals               { ($1, $2) }
+
+Id :: { Id }
+Id : ident { $1 }
+   | monop { $1 }
+   | binop { $1 }
 
 -- Expressions
 Expr ::                      { Sugar }
@@ -100,19 +111,24 @@ TermOrSect : Factor       { $1 }
            | OpTree       { mkOpExpr $1 }
            | OpTree BinOp { RSectS (mkOpExpr $1) $2 }
 
-OpTree ::                    { OpTree }
+OpTree ::                    { OpTree Sugar }
 OpTree : Factor BinOp Factor { Op $2 (Leaf $1) (Leaf $3) }
        | OpTree BinOp Factor { fixPrec $ Op $2 $1 (Leaf $3) }
 
-BinOp ::      { Id }
-BinOp : '+'   { "+" }
-      | ':'   { ":" }
-      | '='   { "=" }
-      | binop { $1 }
+BinOp ::             { Id }
+BinOp : BinOpNoMinus { $1 }
+      | '-'          { "-" }
+
+BinOpNoMinus ::      { Id }
+BinOpNoMinus : '+'   { "+" }
+             | ':'   { ":" }
+             | '='   { "=" }
+             | binop { $1 }
 
 Factor ::             { Sugar }
 Factor : Primary      { $1 }
        | monop Factor { AppS $1 [$2] }
+       | '-' Factor   { AppS  "~" [$2] }
 
 Primary ::                      { Sugar }
 Primary : num                   { numB $1 }
@@ -179,7 +195,10 @@ ListPatt : {- empty -}       { [] }
 
 {
 -- TODO: Errors should contain positions (line + column)
--- Function Declaration Validation
+
+-- Function Declarations
+mkFnArm = uncurry FnArm
+
 fnToDecl :: [FnArm] -> Alex Decl
 fnToDecl body@(a:as)
   | any (name a /=) (map name as)   = alexError "Parse Error, all function names need to match."
@@ -192,36 +211,7 @@ fnToDecl body@(a:as)
 fnToDecl [] = error "Internal Error, Empty function definition."
 
 -- Operator Associativity Parsing
-data Assoc = LeftA  { pri :: Int }
-           | RightA { pri :: Int }
-             deriving (Eq, Show)
-
-data OpTree = Leaf Sugar
-            | Op Id OpTree OpTree
-              deriving (Eq, Show)
-
-assoc :: Id -> Assoc
-assoc op
-  | op `elem` ["or"]                            = LeftA  1
-  | op `elem` ["and"]                           = LeftA  2
-  | op `elem` ["=", "<", "<=", "<>", ">=", ">"] = LeftA  3
-  | op `elem` ["++"]                            = RightA 4
-  | op `elem` ["+", "-"]                        = LeftA  5
-  | op `elem` ["^"]                             = LeftA  5
-  | op `elem` ["*", "/"]                        = LeftA  6
-  | op `elem` [":"]                             = RightA 7
-  | otherwise                                   = RightA 0
-
-fixPrec :: OpTree -> OpTree
-fixPrec (Op i (Op j a b) c)
-  | shouldRot (assoc i) (assoc j) = (Op j a (Op i b c))
-  where
-    shouldRot (LeftA p)  a = p >  (pri a)
-    shouldRot (RightA p) a = p >= (pri a)
-
-fixPrec x = x
-
-mkOpExpr :: OpTree -> Sugar
+mkOpExpr :: OpTree Sugar -> Sugar
 mkOpExpr (Leaf e)   = e
 mkOpExpr (Op i l r) = AppS i [mkOpExpr l, mkOpExpr r]
 
