@@ -18,7 +18,7 @@ $break  = [\n\r\0]
 @op    = $opchr+
 @dec   = $digit+(\.$digit+)?
 @exp   = E[\+\-]?$digit+
-@num   = $digit+(\.$digit+)?(@exp)?
+@num   = \-?@dec(@exp)?
 
 @strbegin = \"[^$break\"]*
 
@@ -38,11 +38,11 @@ geomlab :-
   ";" { tok Semi  }
   "|" { tok VBar  }
 
-  @ident { ident }
-  @op    { op    }
-
   @num        { strTok (Num . read) }
   @strbegin\" { strTok (Str . dequote) }
+
+  @ident { ident }
+  @op    { op    }
 
   -- Error cases
   "}"                     { scanError "#bracematch" }
