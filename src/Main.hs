@@ -6,12 +6,16 @@ import Expr
 import GLParser (parseExpr)
 import Lexer
 import Sugar
+import System.Environment
 import Token
 
-scanTokens :: String -> [Lexeme]
-scanTokens input = either error id (runAlex input loop)
+runAndFormat :: Show a => (a -> IO ()) -> Alex a -> String -> IO ()
+runAndFormat fmt am input = either putStrLn fmt (runAlex input am)
+
+scanTokens :: String -> IO ()
+scanTokens = runAndFormat (putStrLn . unwords . map (show . stripLoc)) loop
   where
-    res = runAlex input loop
+    stripLoc (L t _ _) = t
     loop = do l@(L tok _ _) <- alexMonadScan
               if tok == Eof
               then return []
@@ -19,19 +23,26 @@ scanTokens input = either error id (runAlex input loop)
                       return (l:rest)
 
 
-parse :: String -> [Para Sugar]
-parse input = either error id (runAlex input parseExpr)
+parse :: String -> IO ()
+parse = runAndFormat (mapM_ print) parseExpr
 
-desugar :: String -> [Para Expr]
-desugar input = either error id (runAlex input parseAndDesugar)
-  where
-    parseAndDesugar = do
-      ps <- parseExpr
-      mapM (mapM desugarExpr) ps
+desugar :: String -> IO ()
+desugar = runAndFormat (mapM_ print) (parseExpr >>= mapM (mapM desugarExpr))
+
+processFile :: String -> IO ()
+processFile fname = do
+  putStrLn ("\n\nFile: " ++ fname ++ "\n")
+  input <- readFile fname
+  putStrLn "*** Raw ***\n"
+  putStrLn input
+  putStrLn "*** Scanned  ***\n"
+  scanTokens input
+  putStrLn "\n*** Parsed ***\n"
+  parse input
+  putStrLn "\n*** Desugared  ***\n"
+  desugar input
 
 main :: IO ()
 main = do
-  input <- getContents
-  print (scanTokens input)
-  print (parse input)
-  print (desugar input)
+  files <- getArgs
+  mapM_ processFile files
