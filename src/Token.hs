@@ -87,16 +87,16 @@ assoc op
   | otherwise                                   = RightA 0
 
 fixPrec :: OpTree a -> OpTree a
-fixPrec (Op i (Op j a b) c)
-  | shouldRot (assoc i) (assoc j) = (Op j a (Op i b c))
+fixPrec (Op i (Op j ll lr) r)
+  | shouldRot (assoc i) (assoc j) = (Op j ll (Op i lr r))
   where
     shouldRot (LeftA p)  a = p >  (pri a)
     shouldRot (RightA p) a = p >= (pri a)
 
 fixPrec x = x
 
-keywords :: H.Map String Token
-keywords = H.fromList (keywords ++ binOps ++ monOps)
+kws :: H.Map String Token
+kws = H.fromList (keywords ++ binOps ++ monOps)
   where
     unwrap kw    = (show kw, kw)
     wrap ctr str = (str, ctr str)
@@ -121,4 +121,4 @@ keywords = H.fromList (keywords ++ binOps ++ monOps)
              ]
 
 lookupKw :: String -> Maybe Token
-lookupKw = flip H.lookup keywords
+lookupKw = flip H.lookup kws
