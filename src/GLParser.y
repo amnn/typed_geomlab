@@ -128,19 +128,19 @@ BinOpNoMinus : '+'   { "+" }
 Factor ::             { Sugar }
 Factor : Primary      { $1 }
        | monop Factor { AppS $1 [$2] }
-       | '-' Factor   { AppS  "~" [$2] }
+       | '-' Factor   { AppS "~" [$2] }
 
-Primary ::                      { Sugar }
-Primary : num                   { numB $1 }
-        | atom                  { atomB $1 }
-        | str                   { strB $1 }
-        | ident                 { VarS $1 }
-        | ident '(' Actuals ')' { AppS $1 (reverse $3) }
-        | '[' ListExpr ']'      { $2 }
-        | '(' monop ')'         { VarS $2 }
-        | '(' BinOp ')'         { VarS $2 }
-        | '(' BinOp Term ')'    { LSectS $2 $3 }
-        | '(' ExprOrSect ')'    { $2 }
+Primary ::                          { Sugar }
+Primary : num                       { numB $1 }
+        | atom                      { atomB $1 }
+        | str                       { strB $1 }
+        | ident                     { VarS $1 }
+        | ident '(' Actuals ')'     { AppS $1 (reverse $3) }
+        | '[' ListExpr ']'          { $2 }
+        | '(' monop ')'             { VarS $2 }
+        | '(' BinOp ')'             { VarS $2 }
+        | '(' BinOpNoMinus Term ')' { LSectS $2 $3 }
+        | '(' ExprOrSect ')'        { $2 }
 
 Actuals ::                 { [Sugar] }
 Actuals : {- empty -}      { [] }
