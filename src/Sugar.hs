@@ -52,10 +52,10 @@ instance EmbedsLit Sugar where
   embedLit = LitS
 
 declToDef :: Decl -> Para Sugar
-declToDef (Decl id e) = Def id e
+declToDef (Decl x e) = Def x e
 
 declToLet :: Decl -> Sugar -> Sugar
-declToLet (Decl id e) = LetS id e
+declToLet (Decl x e) = LetS x e
 
 type instance Base Sugar = SugarB
 instance Foldable Sugar where

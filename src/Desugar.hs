@@ -31,17 +31,17 @@ apply :: Id -> [Alex Expr] -> Alex Expr
 apply x es = AppE (VarE x) <$> sequence es
 
 expand :: Alex Expr -> [GenB (Alex Expr)] -> Expr -> Alex Expr
-expand em []     a = do { e <- em; return (consB e a) }
-expand em (g:gs) a = compileGen g a (expand em gs)
+expand em []     acc = do { e <- em; return (consB e acc) }
+expand em (g:gs) acc = compileGen g acc (expand em gs)
   where
     compileGen (FilterB pm) a inner = do
       p <- pm
       i <- inner a
       return (IfE p i a)
     compileGen (GenB p gm)  a inner = do
-      g <- gm
+      gen <- gm
       b <- genSym
       i <- inner (VarE b)
       let f = FnE [ FnArm "" [p,     (VarP b)] i        Nothing
                   , FnArm "" [AnonP, (VarP b)] (VarE b) Nothing]
-      return (AppE (VarE "_mapa") [f, g, a])
+      return (AppE (VarE "_mapa") [f, gen, a])

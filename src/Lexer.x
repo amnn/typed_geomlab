@@ -69,31 +69,32 @@ dequote :: String -> String
 dequote = tail . init
 
 strTok :: (String -> Token) -> AlexAction Lexeme
-strTok t (pos, _, _, rest) len = return (mkLex token pos)
+strTok t (pos, _, _, rest) len = return (mkLex str pos)
   where
-    token = t (take len rest)
+    str = t (take len rest)
 
 tok :: Token -> AlexAction Lexeme
 tok t = strTok (const t)
 
 ident :: AlexAction Lexeme
-ident = strTok $ \id ->
-          case lookupKw id of
+ident = strTok $ \x ->
+          case lookupKw x of
             Just t -> t
-            Nothing -> Ident id
+            Nothing -> Ident x
 
 op :: AlexAction Lexeme
-op = strTok $ \id ->
-       case lookupKw id of
+op = strTok $ \x ->
+       case lookupKw x of
          Just t  -> t
-         Nothing -> BinOp id
+         Nothing -> BinOp x
 
 mkLex :: Token -> AlexPosn -> Lexeme
-mkLex tok (AlexPn _ line col) = L tok line col
+mkLex t (AlexPn _ l c) = L t l c
 
 skipComment :: AlexAction Lexeme
 skipComment _ _ = alexGetInput >>= go 1
   where
+    go :: Int -> AlexInput -> Alex Lexeme
     go 0   input = alexSetInput input >> alexMonadScan
     go lvl input = case alexGetByte input of
                      Nothing -> scanError "#comment" input 0
@@ -103,6 +104,7 @@ skipComment _ _ = alexGetInput >>= go 1
                        | otherwise         -> go  lvl    rest
     fromByte     = chr . fromIntegral
 
+alexEOF :: Alex Lexeme
 alexEOF = return (L Eof 0 0)
 
 scanError :: String -> AlexAction a
@@ -110,7 +112,7 @@ scanError msg (pos, _, _, str) _ =
   alexError (concat ["Syntax Error, ", msg, fmtPosn pos])
   where
     fmtPosn (AlexPn _ line col) =
-      concat [" at line ", show line, ", column ", show col, "."]
+      concat ["near ", str, " at line ", show line, ", column ", show col, "."]
 
 badToken :: AlexAction a
 badToken = scanError "#badtoken"

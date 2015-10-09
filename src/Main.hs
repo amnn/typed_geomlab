@@ -1,11 +1,9 @@
 module Main where
 
-import Control.Monad
-import Desugar
-import Expr
+import Control.Monad ()
+import Desugar (desugarExpr)
 import GLParser (parseExpr)
 import Lexer
-import Sugar
 import System.Environment
 import Token
 
@@ -16,8 +14,8 @@ scanTokens :: String -> IO ()
 scanTokens = runAndFormat (putStrLn . unwords . map (show . stripLoc)) loop
   where
     stripLoc (L t _ _) = t
-    loop = do l@(L tok _ _) <- alexMonadScan
-              if tok == Eof
+    loop = do l@(L t _ _) <- alexMonadScan
+              if t == Eof
               then return []
               else do rest <- loop
                       return (l:rest)
