@@ -1,4 +1,6 @@
 {
+{-# OPTIONS_GHC -w #-}
+
 module Lexer where
 
 import Data.Char (chr)

@@ -38,8 +38,8 @@ instance Show Token where
   show RPar      = ")"
   show Eof       = "\0"
   show (Ident x) = x
-  show (BinOp x) = x
-  show (MonOp x) = x
+  show (BinOp x) = "\"" ++ x
+  show (MonOp x) = "'" ++ x
   show Define    = "define"
   show Else      = "else"
   show Function  = "function"

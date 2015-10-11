@@ -11,14 +11,13 @@ runAndFormat :: Show a => (a -> IO ()) -> Alex a -> String -> IO ()
 runAndFormat fmt am input = either putStrLn fmt (runAlex input am)
 
 scanTokens :: String -> IO ()
-scanTokens = runAndFormat (putStrLn . unwords . map (show . stripLoc)) loop
+scanTokens = runAndFormat (putStrLn . unwords . map show) loop
   where
-    stripLoc (L t _ _) = t
-    loop = do l@(L t _ _) <- alexMonadScan
+    loop = do (L t _ _) <- alexMonadScan
               if t == Eof
               then return []
               else do rest <- loop
-                      return (l:rest)
+                      return (t:rest)
 
 
 parse :: String -> IO ()
