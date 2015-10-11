@@ -61,3 +61,20 @@ spec = do
     , MonOp "not", Ident "true", Semi
     , MonOp "not", Ident "false", Semi
     ]
+
+  lexFile "test/list_comp.geom" $
+    [ Bra, Ident "x", VBar
+    , Ident "x", Gen
+    , Bra, Ident "a", Range, Ident "b", Ket, Ket
+    , Semi
+
+    , Bra, Ident "x", VBar
+    , Bra, Ident "x", Comma, Anon, Ket, Gen
+    , Ident "xs", When, Ident "y", Ket
+    , Semi
+
+    , Bra, Bra, Ident "x", Comma, Ident "y", Ket, VBar
+    , Bra, Ident "x", Comma, Anon, Ket, Gen, Ident "xs", Comma
+    , Ident "y", Gen, Ident "ys", Ket
+    , Semi
+    ]

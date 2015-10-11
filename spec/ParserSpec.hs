@@ -68,3 +68,17 @@ spec = do
     , Eval (AppS "not" [VarS "true"])
     , Eval (AppS "not" [VarS "false"])
     ]
+
+  parseFile "test/list_comp.geom" $
+    map Eval $
+      [ ListCompS (VarS "x")
+          [ GenB (VarP "x") (RangeS (VarS "a") (VarS "b")) ]
+      , ListCompS (VarS "x")
+          [ GenB (enlist [AnonP, (VarP "x")]) (VarS "xs")
+          , FilterB (VarS "y")
+          ]
+      , ListCompS (enlist [VarS "y", VarS "x"])
+          [ GenB (enlist [AnonP, (VarP "x")]) (VarS "xs")
+          , GenB (VarP "y") (VarS "ys")
+          ]
+      ]
