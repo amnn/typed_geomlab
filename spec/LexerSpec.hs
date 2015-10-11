@@ -61,10 +61,3 @@ spec = do
     , MonOp "not", Ident "true", Semi
     , MonOp "not", Ident "false", Semi
     ]
-
-lexFile :: FilePath -> [Token] -> Spec
-lexFile fn expected =
-  describe fn $ do
-    it "lexes" $ do
-      Right actual <- scanTokens fn
-      actual `shouldBe` expected

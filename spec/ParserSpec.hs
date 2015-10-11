@@ -68,10 +68,3 @@ spec = do
     , Eval (AppS "not" [VarS "true"])
     , Eval (AppS "not" [VarS "false"])
     ]
-
-parseFile :: FilePath -> [Para Sugar] -> Spec
-parseFile fn expected =
-  describe fn $ do
-    it "parses" $ do
-      Right actual <- parse fn
-      actual `shouldBe` expected
