@@ -1,4 +1,3 @@
-{-# OPTIONS_GHC -w #-}
 module DesugarSpec where
 
 import Expr
