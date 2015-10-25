@@ -65,7 +65,7 @@ incSym = Alex $ \s@AlexState{alex_ust=ust} ->
                Right (s{alex_ust = ust{syms = x + 1}}, x)
 
 genSym :: Alex Id
-genSym = ("var" ++) . show <$> incSym
+genSym = ("v" ++) . show <$> incSym
 
 dequote :: String -> String
 dequote = tail . init

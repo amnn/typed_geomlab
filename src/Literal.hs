@@ -10,6 +10,7 @@ data LitB a = NumB Double
             | AtomB Id
             | ConsB a a
               deriving ( Eq
+                       , Ord
                        , Show
                        , Functor
                        , Foldable

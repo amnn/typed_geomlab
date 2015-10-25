@@ -28,6 +28,7 @@ executable typed-geomlab
   build-depends:       base >=4.8 && <4.9,
                        array ==0.5.*,
                        hashmap ==1.3.*,
+                       union-find ==0.2.*,
                        recursion-schemes ==4.1.*
 
 test-suite spec
@@ -41,5 +42,7 @@ test-suite spec
   build-depends:    base >=4.8 && <4.9,
                     array ==0.5.*,
                     hashmap ==1.3.*,
+                    union-find ==0.2.*,
                     recursion-schemes ==4.1.*,
-                    hspec ==2.2.*
+                    hspec ==2.2.*,
+                    HUnit ==1.3.*
