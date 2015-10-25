@@ -95,3 +95,7 @@ spec = do
     , Eval (AppE (VarE "not") [VarE "true"])
     , Eval (AppE (VarE "not") [VarE "false"])
     ]
+
+  desugarFile "test/empty.geom" $
+   [ Def "foo" (FnE [] (IfE (VarE "true") (numB 1) (numB 2)))
+   ]

@@ -78,3 +78,10 @@ spec = do
     , Ident "y", Gen, Ident "ys", Ket
     , Semi
     ]
+
+  lexFile "test/empty.geom" $
+    [ Define, Ident "foo", LPar, RPar, BinOp "="
+    , Num 1.0, When, Ident "true"
+    , VBar, Ident "foo", LPar, RPar, BinOp "=", Num 2.0
+    , Semi
+    ]

@@ -82,3 +82,9 @@ spec = do
           , GenB (VarP "y") (VarS "ys")
           ]
       ]
+
+  parseFile "test/empty.geom" $
+    [ Def "foo" (FnS [ FnArm "foo" [] (numB 1.0) (Just (VarS "true"))
+                     , FnArm "foo" [] (numB 2.0) Nothing
+                     ])
+    ]
