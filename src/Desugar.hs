@@ -77,6 +77,11 @@ compileCase (e:es) d as = foldr compileSection (return d)
                         . groupByFstPat
                         $ as
   where
+    compileSection ([], vs) dm
+      | VarE u <- e = do
+      dft   <- dm
+      compileCase es dft (stripVarPat (rename u) <$> vs)
+
     compileSection (ctrs, vs) dm = do
       varCase  <- dm >>= compileVars vs
       ctrCases <- compileCtrs ctrs
@@ -98,8 +103,7 @@ compileCase (e:es) d as = foldr compileSection (return d)
     compileVars [] dft = do { a <- genSym; return (VarPB a, dft) }
     compileVars vs dft = do
       v <- genSym
-      let tr = rename v
-      cases <- compileCase es dft (stripVarPat tr <$> vs)
+      cases <- compileCase es dft (stripVarPat (rename v) <$> vs)
       return (VarPB v, cases)
 
     rename :: Id -> Id -> Id -> Maybe Expr

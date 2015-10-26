@@ -28,7 +28,7 @@ desugarFile = testFile "desugars" cmp desugar
     paraEq (Def x e) (Def y f) = e `alphaEq` f && x == y
     paraEq _         _         = False
 
-    cmp ps qs = all (uncurry paraEq) (zip ps qs)
+    cmp ps qs = length ps == length qs && all (uncurry paraEq) (zip ps qs)
 
 type Result a = IO (Either String a)
 

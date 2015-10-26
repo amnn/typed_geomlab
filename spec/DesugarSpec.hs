@@ -10,50 +10,25 @@ spec :: Spec
 spec = do
   desugarFile "test/compose.geom" $
     [ Def "." (FnE ["f","g"]
-                 (CaseE (VarE "f")
-                    [( VarPB "f"
-                     , CaseE (VarE "g")
-                         [( VarPB "g"
-                          , FnE ["x"]
-                              (CaseE (VarE "x")
-                                 [( VarPB "x"
-                                  , AppE (VarE "f") [AppE (VarE "g") [VarE "x"]]
-                                  )])
-                          )]
-                     )]))
+                 (FnE ["x"]
+                    (AppE (VarE "f") [AppE (VarE "g") [VarE "x"]])))
 
     , Def "add" (FnE ["x"]
-                   (CaseE (VarE "x")
-                      [( VarPB "x"
-                       , AppE (VarE "+") [VarE "x",LitE (NumB 1.0)]
-                       )]))
+                   (AppE (VarE "+") [VarE "x", LitE (NumB 1.0)]))
 
     , Def "add2" (AppE (VarE ".") [VarE "add",VarE "add"])
     ]
 
   desugarFile "test/divmod.geom" $
     let intCast = AppE (VarE "int") [ AppE (VarE "/") [VarE "x", VarE "y"]] in
-    [ Def "div" (FnE ["x", "y"]
-                   (CaseE (VarE "x")
-                      [( VarPB "x"
-                       , CaseE (VarE "y")
-                           [( VarPB "y"
-                            , intCast
-                            )]
-                       )]))
+    [ Def "div" (FnE ["x", "y"] intCast)
 
     , Def "mod" (FnE ["x", "y"]
-                   (CaseE (VarE "x")
-                      [( VarPB "x"
-                       , CaseE (VarE "y")
-                           [( VarPB "y"
-                            , (AppE (VarE "-") [ VarE "x"
-                                               , AppE (VarE "*") [ VarE "y"
-                                                                 , intCast
-                                                                 ]
-                                               ])
-                            )]
-                       )]))
+                   (AppE (VarE "-") [ VarE "x"
+                                    , AppE (VarE "*") [ VarE "y"
+                                                      , intCast
+                                                      ]
+                                    ]))
 
     , Eval (AppE (VarE "div") [VarE "a", VarE "b"])
     , Eval (AppE (VarE "mod") [VarE "c", VarE "d"])
@@ -82,12 +57,9 @@ spec = do
 
   desugarFile "test/not.geom" $
     [ Def "not" (FnE ["p"]
-                   (CaseE (VarE "p")
-                      [( VarPB "q"
-                       , IfE (VarE "q")
-                           (VarE "false")
-                           (VarE "true")
-                       )]))
+                   (IfE (VarE "p")
+                     (VarE "false")
+                     (VarE "true")))
 
     , Eval (AppE (VarE "not") [VarE "true"])
     , Eval (AppE (VarE "not") [VarE "false"])
@@ -96,51 +68,29 @@ spec = do
   desugarFile "test/list_comp.geom" $
     map Eval $
       [ AppE (VarE "_mapa") [ FnE ["x","acc"]
-                                (CaseE (VarE "x")
-                                   [( VarPB "x"
-                                    , CaseE (VarE "acc")
-                                        [( VarPB "acc"
-                                         , LitE (ConsB (VarE "x") (VarE "acc")))])])
-                            , AppE (VarE "_range") [VarE "a",VarE "b"]
+                                (LitE (ConsB (VarE "x") (VarE "acc")))
+                            , AppE (VarE "_range") [VarE "a", VarE "b"]
                             , LitE NilB
                             ]
 
       , AppE (VarE "_mapa") [ FnE ["as","acc"]
                                 (CaseE (VarE "as")
                                    [ ( ValPB (ConsB "b" "bs")
-                                     , CaseE (VarE "b")
-                                         [ ( VarPB "b"
-                                           , CaseE (VarE "bs")
-                                               [ ( ValPB (ConsB "c" "cs")
-                                                 , CaseE (VarE "c")
-                                                     [ ( VarPB "_"
-                                                       , CaseE (VarE "cs")
-                                                           [ ( ValPB NilB
-                                                             , CaseE (VarE "acc")
-                                                                 [( VarPB "acc"
-                                                                  , IfE (VarE "y")
-                                                                      (LitE (ConsB (VarE "b")
-                                                                                   (VarE "acc")))
-                                                                      (VarE "acc")
-                                                                  )]
-                                                             )
-                                                           , ( VarPB "_", FallThroughE)
-                                                           ]
-                                                       )
-                                                     ]
+                                     , CaseE (VarE "bs")
+                                         [ ( ValPB (ConsB "c" "cs")
+                                           , CaseE (VarE "cs")
+                                               [ ( ValPB NilB
+                                                 , IfE (VarE "y")
+                                                     (LitE (ConsB (VarE "b") (VarE "acc")))
+                                                     (VarE "acc")
                                                  )
                                                , ( VarPB "_", FallThroughE)
                                                ]
                                            )
+                                         , ( VarPB "_", FallThroughE)
                                          ]
                                      )
-                                   , ( VarPB "_"
-                                     , CaseE (VarE "acc")
-                                         [ ( VarPB "acc"
-                                           , VarE "acc"
-                                           )
-                                         ]
-                                     )
+                                   , ( VarPB "_", VarE "acc")
                                    ])
                             , VarE "xs"
                             , LitE NilB
@@ -150,49 +100,27 @@ spec = do
           [ FnE ["as","acc"]
               (CaseE (VarE "as")
                  [ ( ValPB (ConsB "b" "bs")
-                   , CaseE (VarE "b")
-                       [ ( VarPB "b"
-                         , CaseE (VarE "bs")
-                             [ ( ValPB (ConsB "c" "cs")
-                               , CaseE (VarE "c")
-                                   [ ( VarPB "_"
-                                     , CaseE (VarE "cs")
-                                         [ ( ValPB NilB
-                                           , CaseE (VarE "acc")
-                                               [ ( VarPB "acc"
-                                                 , AppE (VarE "_mapa")
-                                                     [ FnE ["y","acc"]
-                                                         (CaseE (VarE "y")
-                                                            [ ( VarPB "y"
-                                                              , CaseE (VarE "acc")
-                                                                  [ ( VarPB "acc"
-                                                                    , LitE (ConsB (LitE (ConsB (VarE "b")
-                                                                                               (LitE (ConsB (VarE "y")
-                                                                                                            (LitE NilB)))))
-                                                                                  (VarE "acc"))
-                                                                    )
-                                                                  ]
-                                                              )
-                                                            ])
-                                                     , VarE "ys"
-                                                     , VarE "acc"
-                                                     ]
-                                                 )
-                                               ]
-                                           )
-                                         , ( VarPB "_", FallThroughE)
-                                         ]
-                                     )
+                   , CaseE (VarE "bs")
+                       [ ( ValPB (ConsB "c" "cs")
+                         , CaseE (VarE "cs")
+                             [ ( ValPB NilB
+                               , AppE (VarE "_mapa")
+                                   [ FnE ["d","acc"]
+                                       (LitE (ConsB (LitE (ConsB (VarE "b")
+                                                                 (LitE (ConsB (VarE "d")
+                                                                              (LitE NilB)))))
+                                                    (VarE "acc")))
+                                   , VarE "ys"
+                                   , VarE "acc"
                                    ]
                                )
                              , ( VarPB "_", FallThroughE)
                              ]
                          )
+                       , ( VarPB "_", FallThroughE)
                        ]
                    )
-                 , ( VarPB "_"
-                   , CaseE (VarE "acc")
-                       [ ( VarPB "acc", VarE "acc")])
+                 , ( VarPB "_", VarE "acc")
                  ])
           , VarE "xs"
           , LitE NilB
