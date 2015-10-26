@@ -49,10 +49,11 @@ compileListComp em (g:gs) acc = compileGen g acc (compileListComp em gs)
       return (IfE p i a)
     compileGen (GenB p gm)  a inner = do
       gen <- gm
+      anon <- genSym
       b <- genSym
       i <- inner (VarE b)
-      f <- compileFn [ FnArm "" [p,     (VarP b)] i        Nothing
-                     , FnArm "" [AnonP, (VarP b)] (VarE b) Nothing]
+      f <- compileFn [ FnArm "" [p,           (VarP b)] i        Nothing
+                     , FnArm "" [(VarP anon), (VarP b)] (VarE b) Nothing]
       return (AppE (VarE "_mapa") [f, gen, a])
 
 compileFn :: [FnArmB Expr] -> Alex Expr
@@ -94,7 +95,7 @@ compileCase (e:es) d as = foldr compileSection (return d)
       return (pat, cases)
 
     compileVars :: [FnArmB Expr] -> Expr -> Alex (SimplePatt, Expr)
-    compileVars [] dft = return (AnonPB, dft)
+    compileVars [] dft = do { a <- genSym; return (VarPB a, dft) }
     compileVars vs dft = do
       v <- genSym
       let tr = rename v

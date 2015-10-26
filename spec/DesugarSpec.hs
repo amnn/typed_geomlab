@@ -86,10 +86,7 @@ spec = do
                       [( VarPB "q"
                        , IfE (VarE "q")
                            (VarE "false")
-                           (CaseE (VarE "p")
-                             [ (AnonPB, VarE "true")
-                             , (AnonPB, FailE)
-                             ])
+                           (VarE "true")
                        )]))
 
     , Eval (AppE (VarE "not") [VarE "true"])
@@ -116,7 +113,7 @@ spec = do
                                            , CaseE (VarE "bs")
                                                [ ( ValPB (ConsB "c" "cs")
                                                  , CaseE (VarE "c")
-                                                     [ ( AnonPB
+                                                     [ ( VarPB "_"
                                                        , CaseE (VarE "cs")
                                                            [ ( ValPB NilB
                                                              , CaseE (VarE "acc")
@@ -127,25 +124,23 @@ spec = do
                                                                       (VarE "acc")
                                                                   )]
                                                              )
-                                                           , ( AnonPB, FallThroughE)
+                                                           , ( VarPB "_", FallThroughE)
                                                            ]
                                                        )
-                                                     , ( AnonPB, FallThroughE)
                                                      ]
                                                  )
-                                               , ( AnonPB, FallThroughE)
+                                               , ( VarPB "_", FallThroughE)
                                                ]
                                            )
                                          ]
                                      )
-                                   , ( AnonPB
+                                   , ( VarPB "_"
                                      , CaseE (VarE "acc")
                                          [ ( VarPB "acc"
                                            , VarE "acc"
                                            )
                                          ]
                                      )
-                                   , ( AnonPB, FailE)
                                    ])
                             , VarE "xs"
                             , LitE NilB
@@ -160,7 +155,7 @@ spec = do
                          , CaseE (VarE "bs")
                              [ ( ValPB (ConsB "c" "cs")
                                , CaseE (VarE "c")
-                                   [ ( AnonPB
+                                   [ ( VarPB "_"
                                      , CaseE (VarE "cs")
                                          [ ( ValPB NilB
                                            , CaseE (VarE "acc")
@@ -185,21 +180,19 @@ spec = do
                                                  )
                                                ]
                                            )
-                                         , ( AnonPB, FallThroughE)
+                                         , ( VarPB "_", FallThroughE)
                                          ]
                                      )
-                                   , ( AnonPB, FallThroughE)
                                    ]
                                )
-                             , ( AnonPB, FallThroughE)
+                             , ( VarPB "_", FallThroughE)
                              ]
                          )
                        ]
                    )
-                 , ( AnonPB
+                 , ( VarPB "_"
                    , CaseE (VarE "acc")
                        [ ( VarPB "acc", VarE "acc")])
-                 , ( AnonPB, FailE)
                  ])
           , VarE "xs"
           , LitE NilB

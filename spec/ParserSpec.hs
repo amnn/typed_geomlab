@@ -63,7 +63,7 @@ spec = do
 
   parseFile "test/not.geom" $
     [ Def "not" (FnS [ FnArm "not" [VarP "p"] (VarS "false") (Just (VarS "p"))
-                     , FnArm "not" [AnonP]    (VarS "true")  Nothing
+                     , FnArm "not" [VarP "v0"] (VarS "true")  Nothing
                      ])
     , Eval (AppS "not" [VarS "true"])
     , Eval (AppS "not" [VarS "false"])
@@ -74,11 +74,11 @@ spec = do
       [ ListCompS (VarS "x")
           [ GenB (VarP "x") (RangeS (VarS "a") (VarS "b")) ]
       , ListCompS (VarS "x")
-          [ GenB (enlist [AnonP, (VarP "x")]) (VarS "xs")
+          [ GenB (enlist [VarP "v0", VarP "x"]) (VarS "xs")
           , FilterB (VarS "y")
           ]
       , ListCompS (enlist [VarS "y", VarS "x"])
-          [ GenB (enlist [AnonP, (VarP "x")]) (VarS "xs")
+          [ GenB (enlist [VarP "v1", VarP "x"]) (VarS "xs")
           , GenB (VarP "y") (VarS "ys")
           ]
       ]

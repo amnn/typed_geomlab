@@ -181,7 +181,7 @@ PattPrimCons : PattPrim                  { [$1] }
 PattPrim ::                 { Patt }
 PattPrim : ident            { VarP $1 }
          | atom             { atomB $1 }
-         | '_'              { AnonP }
+         | '_'              {% fmap VarP genSym }
          | num              { numB $1 }
          | str              { strB $1 }
          | ident Formals    { CtrP $1 $2 }
