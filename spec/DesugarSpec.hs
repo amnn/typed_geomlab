@@ -96,6 +96,116 @@ spec = do
     , Eval (AppE (VarE "not") [VarE "false"])
     ]
 
+  desugarFile "test/list_comp.geom" $
+    map Eval $
+      [ AppE (VarE "_mapa") [ FnE ["x","acc"]
+                                (CaseE (VarE "x")
+                                   [( VarPB "x"
+                                    , CaseE (VarE "acc")
+                                        [( VarPB "acc"
+                                         , LitE (ConsB (VarE "x") (VarE "acc")))])])
+                            , AppE (VarE "_range") [VarE "a",VarE "b"]
+                            , LitE NilB
+                            ]
+
+      , AppE (VarE "_mapa") [ FnE ["as","acc"]
+                                (CaseE (VarE "as")
+                                   [ ( ValPB (ConsB "b" "bs")
+                                     , CaseE (VarE "b")
+                                         [ ( VarPB "b"
+                                           , CaseE (VarE "bs")
+                                               [ ( ValPB (ConsB "c" "cs")
+                                                 , CaseE (VarE "c")
+                                                     [ ( AnonPB
+                                                       , CaseE (VarE "cs")
+                                                           [ ( ValPB NilB
+                                                             , CaseE (VarE "acc")
+                                                                 [( VarPB "acc"
+                                                                  , IfE (VarE "y")
+                                                                      (LitE (ConsB (VarE "b")
+                                                                                   (VarE "acc")))
+                                                                      (VarE "acc")
+                                                                  )]
+                                                             )
+                                                           , ( AnonPB, FallThroughE)
+                                                           ]
+                                                       )
+                                                     , ( AnonPB, FallThroughE)
+                                                     ]
+                                                 )
+                                               , ( AnonPB, FallThroughE)
+                                               ]
+                                           )
+                                         ]
+                                     )
+                                   , ( AnonPB
+                                     , CaseE (VarE "acc")
+                                         [ ( VarPB "acc"
+                                           , VarE "acc"
+                                           )
+                                         ]
+                                     )
+                                   , ( AnonPB, FailE)
+                                   ])
+                            , VarE "xs"
+                            , LitE NilB
+                            ]
+
+      , AppE (VarE "_mapa")
+          [ FnE ["as","acc"]
+              (CaseE (VarE "as")
+                 [ ( ValPB (ConsB "b" "bs")
+                   , CaseE (VarE "b")
+                       [ ( VarPB "b"
+                         , CaseE (VarE "bs")
+                             [ ( ValPB (ConsB "c" "cs")
+                               , CaseE (VarE "c")
+                                   [ ( AnonPB
+                                     , CaseE (VarE "cs")
+                                         [ ( ValPB NilB
+                                           , CaseE (VarE "acc")
+                                               [ ( VarPB "acc"
+                                                 , AppE (VarE "_mapa")
+                                                     [ FnE ["y","acc"]
+                                                         (CaseE (VarE "y")
+                                                            [ ( VarPB "y"
+                                                              , CaseE (VarE "acc")
+                                                                  [ ( VarPB "acc"
+                                                                    , LitE (ConsB (LitE (ConsB (VarE "b")
+                                                                                               (LitE (ConsB (VarE "y")
+                                                                                                            (LitE NilB)))))
+                                                                                  (VarE "acc"))
+                                                                    )
+                                                                  ]
+                                                              )
+                                                            ])
+                                                     , VarE "ys"
+                                                     , VarE "acc"
+                                                     ]
+                                                 )
+                                               ]
+                                           )
+                                         , ( AnonPB, FallThroughE)
+                                         ]
+                                     )
+                                   , ( AnonPB, FallThroughE)
+                                   ]
+                               )
+                             , ( AnonPB, FallThroughE)
+                             ]
+                         )
+                       ]
+                   )
+                 , ( AnonPB
+                   , CaseE (VarE "acc")
+                       [ ( VarPB "acc", VarE "acc")])
+                 , ( AnonPB, FailE)
+                 ])
+          , VarE "xs"
+          , LitE NilB
+          ]
+      ]
+
   desugarFile "test/empty.geom" $
-   [ Def "foo" (FnE [] (IfE (VarE "true") (numB 1) (numB 2)))
-   ]
+    [ Def "foo" (FnE [] (IfE (VarE "true") (numB 1) (numB 2)))
+    ]
