@@ -1,9 +1,12 @@
-{-# LANGUAGE TypeFamilies, DeriveFunctor #-}
+{-# LANGUAGE TypeFamilies, DeriveFoldable, DeriveFunctor #-}
 
 module Expr where
 
 import Prelude hiding (Foldable)
+import qualified Prelude as P (Foldable)
 import Control.Applicative ((<|>))
+import Data.Foldable (toList)
+import Data.Function (on)
 import Data.Functor.Foldable
 import qualified Data.HashMap as H
 import Data.Maybe (fromMaybe)
@@ -36,7 +39,7 @@ data ExprB a = LitEB (LitB a)
              | SeqEB a a
              | FailEB
              | FallThroughEB
-               deriving (Eq, Show, Functor)
+               deriving (Eq, Show, P.Foldable, Functor)
 
 instance EmbedsLit Expr where
   embedLit = LitE
@@ -76,28 +79,19 @@ alphaEq :: Expr -> Expr -> Bool
 alphaEq = alphaEq' (H.empty, H.empty, 0)
 
 alphaEq' :: (H.Map Id Int, H.Map Id Int, Int) -> Expr -> Expr -> Bool
-alphaEq' lvlInfo = eq
+alphaEq' lvlInfo@(o', p', _) = eq
   where
-    eq (LitE (ConsB x y)) (LitE (ConsB z w)) = x `eq` z && y `eq` w
-    eq (LitE l)           (LitE m)           = l == m
-
-    eq (IfE c t e)    (IfE d u f)    = c `eq` d && t `eq` u && e `eq` f
-    eq (SeqE a b)     (SeqE c d)     = a `eq` c && b `eq` d
-    eq (AppE f xs)    (AppE g ys)    = and (zipWith eq (f:xs) (g:ys))
-
+    eq (FnE [] e)     (FnE [] f)     = e `eq` f
+    eq (FnE (x:xs) e) (FnE (y:ys) f) = alphaEq' (pushVars (x, y) lvlInfo) (FnE xs e) (FnE ys f)
+    eq (LetE x e f)   (LetE y g h)   = e `eq` g && alphaEq' (pushVars (x, y) lvlInfo) f h
+    eq (VarE x)       (VarE y)       = fromMaybe (x == y)
+                                     $ (==) <$> checkL x <*> (checkR y <|> Just (-1))
     eq (CaseE e as)   (CaseE f bs)   = e `eq` f
                                     && length as == length bs
                                     && all (uncurry armsEq) (zip as bs)
+    eq e              f              = (structEq `on` project) e f
 
-    eq (FnE [] e)     (FnE [] f)     = e `eq` f
-    eq (FnE (x:xs) e) (FnE (y:ys) f) = alphaEq' (pushVars (x, y) lvlInfo) (FnE xs e) (FnE ys f)
-
-    eq (LetE x e f)   (LetE y g h)   = e `eq` g && alphaEq' (pushVars (x, y) lvlInfo) f h
-
-    eq (VarE x)       (VarE y)       = fromMaybe (x == y)
-                                     $ (==) <$> checkL x <*> (checkR y <|> Just (-1))
-
-    eq e f = e == f
+    structEq e f = e `shapeEq` f && and ((zipWith eq `on` toList) e f)
 
     armsEq (q, e) (r, f) = (isVar q && isVar r || q `shapeEq` r)
                         && let vars = zip (patVars q) (patVars r) in
@@ -105,5 +99,5 @@ alphaEq' lvlInfo = eq
 
     pushVars (x, y) (o, p, lvl) = (H.insert x lvl o, H.insert y lvl p, lvl + 1)
 
-    checkL x = let (o, _, _) = lvlInfo in H.lookup x o
-    checkR y = let (_, p, _) = lvlInfo in H.lookup y p
+    checkL x = H.lookup x o'
+    checkR y = H.lookup y p'
