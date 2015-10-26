@@ -4,12 +4,12 @@ module Expr where
 
 import Prelude hiding (Foldable)
 import Control.Applicative ((<|>))
-import Data.Function (on)
 import Data.Functor.Foldable
 import qualified Data.HashMap as H
 import Data.Maybe (fromMaybe)
 import Literal
 import Patt
+import Structure
 import Token (Id)
 
 data Expr = LitE (LitB Expr)
@@ -102,8 +102,6 @@ alphaEq' lvlInfo = eq
     armsEq (q, e) (r, f) = (isVar q && isVar r || q `shapeEq` r)
                         && let vars = zip (patVars q) (patVars r) in
                              alphaEq' (foldr pushVars lvlInfo vars) e f
-
-    shapeEq = (==) `on` patShape
 
     pushVars (x, y) (o, p, lvl) = (H.insert x lvl o, H.insert y lvl p, lvl + 1)
 

@@ -59,9 +59,6 @@ isVar :: PattB a -> Bool
 isVar (VarPB _) = True
 isVar _         = False
 
-patShape :: PattB a -> SimplePattShape
-patShape = fmap (const ())
-
 patVars :: SimplePatt -> [Id]
 patVars (VarPB i) = [i]
 patVars p         = toList p

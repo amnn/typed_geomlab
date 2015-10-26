@@ -11,6 +11,7 @@ import Lexer
 import Literal
 import Patt
 import Sugar
+import Structure (shape)
 import Token (Id)
 
 desugarExpr :: Sugar -> Alex Expr
@@ -129,7 +130,7 @@ compileCase (e:es) d as = foldr compileSection (return d)
     fstPat :: FnArmB Expr -> Patt
     fstPat (FnArm _ ps _ _) = head ps
 
-    fstPatShape = patShape . project . fstPat
+    fstPatShape = shape . project . fstPat
 
     isFstPatVar :: FnArmB Expr -> Bool
     isFstPatVar arm =
