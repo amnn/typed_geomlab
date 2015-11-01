@@ -29,10 +29,6 @@ desugarExpr = cata d
     d (ListCompSB s gs) = compileListComp s gs nilB
     d (FnSB arms)       = sequence (map sequence arms) >>= compileFn
 
--- arms :: [FnArmB (Alex Expr)]
--- map sequence arms :: [Alex (FnArmB Expr)]
--- sequence (map sequence arms) :: Alex [FnArmB Expr]
-
 var :: Id -> Alex Expr
 var = return . VarE
 
