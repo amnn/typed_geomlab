@@ -11,107 +11,107 @@ spec = do
   desugarFile "test/compose.geom" $
     [ Def "." (FnE ["f","g"]
                  (FnE ["x"]
-                    (AppE (VarE "f") [AppE (VarE "g") [VarE "x"]])))
+                    (AppE (FreeE "f") [AppE (FreeE "g") [FreeE "x"]])))
 
     , Def "add" (FnE ["x"]
-                   (AppE (VarE "+") [VarE "x", LitE (NumB 1.0)]))
+                   (AppE (FreeE "+") [FreeE "x", LitE (NumB 1.0)]))
 
-    , Def "add2" (AppE (VarE ".") [VarE "add",VarE "add"])
+    , Def "add2" (AppE (FreeE ".") [FreeE "add",FreeE "add"])
     ]
 
   desugarFile "test/divmod.geom" $
-    let intCast = AppE (VarE "int") [ AppE (VarE "/") [VarE "x", VarE "y"]] in
+    let intCast = AppE (FreeE "int") [ AppE (FreeE "/") [FreeE "x", FreeE "y"]] in
     [ Def "div" (FnE ["x", "y"] intCast)
 
     , Def "mod" (FnE ["x", "y"]
-                   (AppE (VarE "-") [ VarE "x"
-                                    , AppE (VarE "*") [ VarE "y"
-                                                      , intCast
-                                                      ]
-                                    ]))
+                   (AppE (FreeE "-") [ FreeE "x"
+                                     , AppE (FreeE "*") [ FreeE "y"
+                                                        , intCast
+                                                        ]
+                                     ]))
 
-    , Eval (AppE (VarE "div") [VarE "a", VarE "b"])
-    , Eval (AppE (VarE "mod") [VarE "c", VarE "d"])
+    , Eval (AppE (FreeE "div") [FreeE "a", FreeE "b"])
+    , Eval (AppE (FreeE "mod") [FreeE "c", FreeE "d"])
     ]
 
   desugarFile "test/monop_fn.geom" $
-    [ Eval (AppE (VarE "~") [numB 10.0])
+    [ Eval (AppE (FreeE "~") [numB 10.0])
     , Eval (numB (-10.0))
-    , Eval (AppE (VarE "~") [numB (-10)])
+    , Eval (AppE (FreeE "~") [numB (-10)])
     ]
 
   desugarFile "test/neg.geom" $
-    [ Eval (AppE (VarE "~") [AppE (VarE "~") [numB 10.0]])
-    , Eval (AppE (VarE "+") [ numB 1
-                            , AppE (VarE "~") [ AppE (VarE "+") [ VarE "x"
-                                                                , numB 1.0
-                                                                ]
-                                              ]
-                            ])
-    , Eval (AppE (VarE "+") [ AppE (VarE "+") [ numB 1.0
-                                              , AppE (VarE "~") [VarE "x"]
-                                              ]
-                            , numB 1.0
-                            ])
+    [ Eval (AppE (FreeE "~") [AppE (FreeE "~") [numB 10.0]])
+    , Eval (AppE (FreeE "+") [ numB 1
+                             , AppE (FreeE "~") [ AppE (FreeE "+") [ FreeE "x"
+                                                                   , numB 1.0
+                                                                   ]
+                                                ]
+                             ])
+    , Eval (AppE (FreeE "+") [ AppE (FreeE "+") [ numB 1.0
+                                                , AppE (FreeE "~") [FreeE "x"]
+                                                ]
+                             , numB 1.0
+                             ])
     ]
 
   desugarFile "test/not.geom" $
     [ Def "not" (FnE ["p"]
-                   (IfE (VarE "p")
-                     (VarE "false")
-                     (VarE "true")))
+                   (IfE (FreeE "p")
+                     (FreeE "false")
+                     (FreeE "true")))
 
-    , Eval (AppE (VarE "not") [VarE "true"])
-    , Eval (AppE (VarE "not") [VarE "false"])
+    , Eval (AppE (FreeE "not") [FreeE "true"])
+    , Eval (AppE (FreeE "not") [FreeE "false"])
     ]
 
   desugarFile "test/list_comp.geom" $
     map Eval $
-      [ AppE (VarE "_mapa") [ FnE ["x","acc"]
-                                (LitE (ConsB (VarE "x") (VarE "acc")))
-                            , AppE (VarE "_range") [VarE "a", VarE "b"]
-                            , LitE NilB
-                            ]
+      [ AppE (FreeE "_mapa") [ FnE ["x","acc"]
+                                 (LitE (ConsB (FreeE "x") (FreeE "acc")))
+                             , AppE (FreeE "_range") [FreeE "a", FreeE "b"]
+                             , LitE NilB
+                             ]
 
-      , AppE (VarE "_mapa") [ FnE ["as","acc"]
-                                (CaseE (VarE "as")
-                                   [ ( ValPB (ConsB "b" "bs")
-                                     , CaseE (VarE "bs")
-                                         [ ( ValPB (ConsB "c" "cs")
-                                           , CaseE (VarE "cs")
-                                               [ ( ValPB NilB
-                                                 , IfE (VarE "y")
-                                                     (LitE (ConsB (VarE "b") (VarE "acc")))
-                                                     (VarE "acc")
-                                                 )
-                                               , ( VarPB "_", FallThroughE)
-                                               ]
-                                           )
-                                         , ( VarPB "_", FallThroughE)
-                                         ]
-                                     )
-                                   , ( VarPB "_", VarE "acc")
-                                   ])
-                            , VarE "xs"
-                            , LitE NilB
-                            ]
+      , AppE (FreeE "_mapa") [ FnE ["as","acc"]
+                                 (CaseE (FreeE "as")
+                                    [ ( ValPB (ConsB "b" "bs")
+                                      , CaseE (FreeE "bs")
+                                          [ ( ValPB (ConsB "c" "cs")
+                                            , CaseE (FreeE "cs")
+                                                [ ( ValPB NilB
+                                                  , IfE (FreeE "y")
+                                                      (LitE (ConsB (FreeE "b") (FreeE "acc")))
+                                                      (FreeE "acc")
+                                                  )
+                                                , ( VarPB "_", FallThroughE)
+                                                ]
+                                            )
+                                          , ( VarPB "_", FallThroughE)
+                                          ]
+                                      )
+                                    , ( VarPB "_", FreeE "acc")
+                                    ])
+                             , FreeE "xs"
+                             , LitE NilB
+                             ]
 
-      , AppE (VarE "_mapa")
+      , AppE (FreeE "_mapa")
           [ FnE ["as","acc"]
-              (CaseE (VarE "as")
+              (CaseE (FreeE "as")
                  [ ( ValPB (ConsB "b" "bs")
-                   , CaseE (VarE "bs")
+                   , CaseE (FreeE "bs")
                        [ ( ValPB (ConsB "c" "cs")
-                         , CaseE (VarE "cs")
+                         , CaseE (FreeE "cs")
                              [ ( ValPB NilB
-                               , AppE (VarE "_mapa")
+                               , AppE (FreeE "_mapa")
                                    [ FnE ["d","acc"]
-                                       (LitE (ConsB (LitE (ConsB (VarE "b")
-                                                                 (LitE (ConsB (VarE "d")
+                                       (LitE (ConsB (LitE (ConsB (FreeE "b")
+                                                                 (LitE (ConsB (FreeE "d")
                                                                               (LitE NilB)))))
-                                                    (VarE "acc")))
-                                   , VarE "ys"
-                                   , VarE "acc"
+                                                    (FreeE "acc")))
+                                   , FreeE "ys"
+                                   , FreeE "acc"
                                    ]
                                )
                              , ( VarPB "_", FallThroughE)
@@ -120,13 +120,13 @@ spec = do
                        , ( VarPB "_", FallThroughE)
                        ]
                    )
-                 , ( VarPB "_", VarE "acc")
+                 , ( VarPB "_", FreeE "acc")
                  ])
-          , VarE "xs"
+          , FreeE "xs"
           , LitE NilB
           ]
       ]
 
   desugarFile "test/empty.geom" $
-    [ Def "foo" (FnE [] (IfE (VarE "true") (numB 1) (numB 2)))
+    [ Def "foo" (FnE [] (IfE (FreeE "true") (numB 1) (numB 2)))
     ]

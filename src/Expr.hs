@@ -16,7 +16,8 @@ import Structure
 import Token (Id)
 
 data Expr = LitE (LitB Expr)
-          | VarE Id
+          | VarE Int
+          | FreeE Id
           | IfE Expr Expr Expr
           | CaseE Expr [(SimplePatt, Expr)]
           | FnE [Id] Expr
@@ -30,7 +31,8 @@ data Expr = LitE (LitB Expr)
             deriving (Eq, Show)
 
 data ExprB a = LitEB (LitB a)
-             | VarEB Id
+             | VarEB Int
+             | FreeEB Id
              | IfEB a a a
              | CaseEB a [(SimplePatt, a)]
              | FnEB [Id] a
@@ -48,6 +50,7 @@ type instance Base Expr = ExprB
 instance Foldable Expr where
   project (LitE s)     = LitEB s
   project (VarE x)     = VarEB x
+  project (FreeE x)    = FreeEB x
   project (IfE c t e)  = IfEB c t e
   project (CaseE e as) = CaseEB e as
   project (FnE xs e)   = FnEB xs e
@@ -60,6 +63,7 @@ instance Foldable Expr where
 instance Unfoldable Expr where
   embed (LitEB s)     = LitE s
   embed (VarEB x)     = VarE x
+  embed (FreeEB x)    = FreeE x
   embed (IfEB c t e)  = IfE c t e
   embed (CaseEB e as) = CaseE e as
   embed (FnEB xs e)   = FnE xs e
@@ -72,7 +76,7 @@ instance Unfoldable Expr where
 sub :: (Id -> Maybe Expr) -> Expr -> Expr
 sub tr = cata $ \e ->
   case e of
-    VarEB i -> fromMaybe (VarE i) (tr i)
+    FreeEB i -> fromMaybe (FreeE i) (tr i)
     other   -> embed other
 
 alphaEq :: Expr -> Expr -> Bool
@@ -84,7 +88,7 @@ alphaEq' lvlInfo@(o', p', _) = eq
     eq (FnE [] e)     (FnE [] f)     = e `eq` f
     eq (FnE (x:xs) e) (FnE (y:ys) f) = alphaEq' (pushVars (x, y) lvlInfo) (FnE xs e) (FnE ys f)
     eq (LetE x e f)   (LetE y g h)   = e `eq` g && alphaEq' (pushVars (x, y) lvlInfo) f h
-    eq (VarE x)       (VarE y)       = fromMaybe (x == y)
+    eq (FreeE x)      (FreeE y)      = fromMaybe (x == y)
                                      $ (==) <$> checkL x <*> (checkR y <|> Just (-1))
     eq (CaseE e as)   (CaseE f bs)   = e `eq` f
                                     && length as == length bs

@@ -30,10 +30,10 @@ desugarExpr = cata d
     d (FnSB arms)       = sequence (map sequence arms) >>= compileFn
 
 var :: Id -> Alex Expr
-var = return . VarE
+var = return . FreeE
 
 apply :: Id -> [Alex Expr] -> Alex Expr
-apply x es = AppE (VarE x) <$> sequence es
+apply x es = AppE (FreeE x) <$> sequence es
 
 compileListComp :: Alex Expr -> [GenB (Alex Expr)] -> Expr -> Alex Expr
 compileListComp em []     acc = do { e <- em; return (consB e acc) }
@@ -47,16 +47,16 @@ compileListComp em (g:gs) acc = compileGen g acc (compileListComp em gs)
       gen <- gm
       anon <- genSym
       b <- genSym
-      i <- inner (VarE b)
-      f <- compileFn [ FnArm "" [p,           (VarP b)] i        Nothing
-                     , FnArm "" [(VarP anon), (VarP b)] (VarE b) Nothing]
-      return (AppE (VarE "_mapa") [f, gen, a])
+      i <- inner (FreeE b)
+      f <- compileFn [ FnArm "" [p,           (VarP b)] i         Nothing
+                     , FnArm "" [(VarP anon), (VarP b)] (FreeE b) Nothing]
+      return (AppE (FreeE "_mapa") [f, gen, a])
 
 compileFn :: [FnArmB Expr] -> Alex Expr
 compileFn []       = error "compileFn: No arms in function body."
 compileFn as@(a:_) = do
   xs <- replicateM arity genSym
-  e  <- compileCase (VarE <$> xs) FailE as
+  e  <- compileCase (FreeE <$> xs) FailE as
   return (FnE xs e)
   where
     arity = let FnArm _ ps _ _ = a in length ps
@@ -74,7 +74,7 @@ compileCase (e:es) d as = foldr compileSection (return d)
                         $ as
   where
     compileSection ([], vs) dm
-      | VarE u <- e = do
+      | FreeE u <- e = do
       dft   <- dm
       compileCase es dft (stripVarPat (rename u) <$> vs)
 
@@ -88,10 +88,10 @@ compileCase (e:es) d as = foldr compileSection (return d)
                  . sortBy (comparing fstPatShape)
 
     compileCtrGroup :: [FnArmB Expr] -> Alex (SimplePatt, Expr)
-    compileCtrGroup []         = error "compileCtrGroup: Empty Constructor Group"
+    compileCtrGroup []       = error "compileCtrGroup: Empty Constructor Group"
     compileCtrGroup cs@(c:_) = do
       pat  <- mapM (const genSym) . project . fstPat $ c
-      let es' = (VarE <$> toList pat) ++ es
+      let es' = (FreeE <$> toList pat) ++ es
       cases <- compileCase es' FallThroughE (stripCtrPat <$> cs)
       return (pat, cases)
 
@@ -104,7 +104,7 @@ compileCase (e:es) d as = foldr compileSection (return d)
 
     rename :: Id -> Id -> Id -> Maybe Expr
     rename v w u
-      | w == u    = Just (VarE v)
+      | w == u    = Just (FreeE v)
       | otherwise = Nothing
 
     pairSections :: [[FnArmB Expr]] -> [([FnArmB Expr], [FnArmB Expr])]
