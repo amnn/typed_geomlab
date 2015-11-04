@@ -64,6 +64,7 @@ incSym = Alex $ \s@AlexState{alex_ust=ust} ->
            let x = syms ust in
                Right (s{alex_ust = ust{syms = x + 1}}, x)
 
+-- | Generate a new, unique identifier.
 genSym :: Alex Id
 genSym = ("v" ++) . show <$> incSym
 
@@ -93,6 +94,7 @@ op = strTok $ \x ->
 mkLex :: Token -> AlexPosn -> Lexeme
 mkLex t (AlexPn _ l c) = L t l c
 
+-- | Eat up nested comments and return the following token.
 skipComment :: AlexAction Lexeme
 skipComment _ _ = alexGetInput >>= go 1
   where
