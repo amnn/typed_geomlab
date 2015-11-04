@@ -70,6 +70,7 @@ data OpTree a = Leaf a
               | Op Id (OpTree a) (OpTree a)
                 deriving (Eq, Show)
 
+-- | Order of precedence and associativity of binary operators.
 assoc :: Id -> Assoc
 assoc op
   | op `elem` ["or"]                            = LeftA  1
@@ -86,6 +87,9 @@ assoc op
   | op `elem` [":"]                             = RightA 7
   | otherwise                                   = RightA 0
 
+-- | Assuming the input is a left leaning operator tree whose children
+-- are correctly associated, this function will fix the precedence and
+-- associativity at the top-level.
 fixPrec :: OpTree a -> OpTree a
 fixPrec (Op i (Op j ll lr) r)
   | shouldRot (assoc i) (assoc j) = (Op j ll (Op i lr r))
@@ -95,6 +99,7 @@ fixPrec (Op i (Op j ll lr) r)
 
 fixPrec x = x
 
+-- | A map from identifiers to reserved keywords in the language.
 kws :: H.Map String Token
 kws = H.fromList (keywords ++ binOps ++ monOps)
   where
@@ -120,5 +125,7 @@ kws = H.fromList (keywords ++ binOps ++ monOps)
              , "not"
              ]
 
+-- | Determine the keyword that corresponds to the given @ String @, if one
+-- exists.
 lookupKw :: String -> Maybe Token
 lookupKw = flip H.lookup kws

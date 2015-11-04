@@ -9,6 +9,21 @@ import Literal
 import Patt
 import Token (Id)
 
+-- | The AST, after it has been desugared. Changes include:
+--
+--    * de Bruijn index representation of local variables (Free variables retain
+--    their string identifier).
+--
+--    * Pattern matching is de-coupled from the function notation, into a
+--    separate Case expression which does not support nesting. Functions that
+--    use patterns are desugared into a function whose formal parameters are
+--    passed directly to a case expression.
+--
+--    * Function application supports arbitrary expressions in the callable
+--    position, not just identifiers.
+--
+--    * Extra expressions (@ FailE @, @ FallThroughE @) have been added to
+--    support the proper compilation of pattern matching.
 data Expr = LitE (LitB Expr)
           | VarE !Int
           | FreeE Id
@@ -24,6 +39,7 @@ data Expr = LitE (LitB Expr)
           | FallThroughE
             deriving (Eq, Show)
 
+-- | A functor whose least-fixed point is isomorphic to @ Expr @.
 data ExprB a = LitEB (LitB a)
              | VarEB !Int
              | FreeEB Id

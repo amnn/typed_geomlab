@@ -4,6 +4,8 @@ module Literal where
 
 import Token (Id)
 
+-- | Structure of Literal values shared by Patterns, the AST and the Desugared
+-- AST.
 data LitB a = NumB Double
             | StrB String
             | NilB
@@ -17,6 +19,9 @@ data LitB a = NumB Double
                        , Traversable
                        )
 
+-- | Any data structure which can internalise the shape of a literal should
+-- implement this class, in order to make the creation of literals in that
+-- structure easier.
 class EmbedsLit a where
   embedLit :: LitB a -> a
 
