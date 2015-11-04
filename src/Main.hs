@@ -24,7 +24,10 @@ parse :: String -> IO ()
 parse = runAndFormat (mapM_ print) parseExpr
 
 desugar :: String -> IO ()
-desugar = runAndFormat (mapM_ print) (parseExpr >>= mapM (mapM desugarExpr))
+desugar = runAndFormat (mapM_ print) desugarM
+  where
+    desugarM = do { s <- parseExpr; return (applyDesugar s) }
+    applyDesugar = map (fmap desugarExpr)
 
 processFile :: String -> IO ()
 processFile fname = do

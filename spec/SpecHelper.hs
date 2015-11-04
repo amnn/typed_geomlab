@@ -22,13 +22,7 @@ parseFile :: FilePath -> [Para Sugar] -> Spec
 parseFile = testFile "parses" (==) parse
 
 desugarFile :: FilePath -> [Para Expr] -> Spec
-desugarFile = testFile "desugars" cmp desugar
-  where
-    paraEq (Eval e)  (Eval f)  = e `alphaEq` f
-    paraEq (Def x e) (Def y f) = e `alphaEq` f && x == y
-    paraEq _         _         = False
-
-    cmp ps qs = length ps == length qs && all (uncurry paraEq) (zip ps qs)
+desugarFile = testFile "desugars" (==) desugar
 
 type Result a = IO (Either String a)
 
@@ -47,7 +41,7 @@ parse input = return (runAlex input parseExpr)
 desugar :: FilePath -> Result [Para Expr]
 desugar input = return (runAlex input pAndDExpr)
   where
-    pAndDExpr = parseExpr >>= mapM (mapM desugarExpr)
+    pAndDExpr = parseExpr >>= return . map (fmap desugarExpr)
 
 testFile :: Show a
          => String

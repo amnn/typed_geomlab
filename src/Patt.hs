@@ -7,6 +7,7 @@ import qualified Prelude as P (Foldable)
 import Data.Foldable (toList)
 import Data.Functor.Foldable
 import Literal
+import Structure
 import Token (Id)
 
 data Patt = ValP (LitB Patt)
@@ -38,8 +39,7 @@ data FnArmB a = FnArm Id [Patt] a (Maybe a)
                          , Traversable
                          )
 
-type SimplePatt = PattB Id
-type SimplePattShape = PattB ()
+type SimplePatt = PattB ()
 
 type instance Base Patt = PattB
 instance Foldable Patt where
@@ -56,9 +56,12 @@ isVar :: PattB a -> Bool
 isVar (VarPB _) = True
 isVar _         = False
 
-patVars :: SimplePatt -> [Id]
-patVars (VarPB i) = [i]
-patVars p         = toList p
+holes :: PattB a -> Int
+holes (VarPB _) = 1
+holes p         = length (toList p)
+
+simplify :: Patt -> SimplePatt
+simplify = shape . project
 
 subPats :: Patt -> [Patt]
 subPats = toList . project
