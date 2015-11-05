@@ -62,7 +62,7 @@ var v l vs =
 -- | Convert a function application in the source language into one in the
 -- desugared language.
 apply :: Id -> [IxExpr] -> IxExpr
-apply x xs = embedIx (AppEB (var x) xs)
+apply x = embedIx . AppEB (var x)
 
 -- | Desugaring of (possibly recursive) let expressions. This is not a simple
 -- embedding because a @ let @ expression introduces a variable.
