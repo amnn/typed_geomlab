@@ -8,7 +8,7 @@ import Data.Char (chr)
 import Token
 }
 
-%wrapper "monadUserState"
+%wrapper "monad"
 
 $ws     = [\t\n\r\ ]
 $digit  = 0-9
@@ -53,20 +53,6 @@ geomlab :-
   @dec"E"[\+\-]?[^$digit] { badToken }
   .                       { badToken }
 {
-
-data AlexUserState = AlexUserState { syms :: Int }
-
-alexInitUserState :: AlexUserState
-alexInitUserState = AlexUserState { syms = 0 }
-
-incSym :: Alex Int
-incSym = Alex $ \s@AlexState{alex_ust=ust} ->
-           let x = syms ust in
-               Right (s{alex_ust = ust{syms = x + 1}}, x)
-
--- | Generate a new, unique identifier.
-genSym :: Alex Id
-genSym = ("v" ++) . show <$> incSym
 
 dequote :: String -> String
 dequote = tail . init
