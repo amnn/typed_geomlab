@@ -166,13 +166,9 @@ Patts : {- empty -}    { [] }
       | Patt           { [$1] }
       | Patts ',' Patt { $3 : $1 }
 
-Patt ::             { Patt }
-Patt : PattFactor   { $1 }
-     | Patt '+' num { OffsetP $1 $3 }
-
-PattFactor ::                          { Patt }
-PattFactor : PattPrim                  { $1 }
-           | PattPrimCons ':' PattPrim { enlist1 ($3 : $1) }
+Patt ::                          { Patt }
+Patt : PattPrim                  { $1 }
+     | PattPrimCons ':' PattPrim { enlist1 ($3 : $1) }
 
 PattPrimCons ::                          { [Patt] }
 PattPrimCons : PattPrim                  { [$1] }
@@ -184,7 +180,6 @@ PattPrim : ident            { VarP $1 }
          | '_'              { VarP "_" }
          | num              { numB $1 }
          | str              { strB $1 }
-         | ident Formals    { CtrP $1 $2 }
          | '(' Patt ')'     { $2 }
          | '[' ListPatt ']' { enlist $2 }
 

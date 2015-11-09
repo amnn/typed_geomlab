@@ -14,15 +14,11 @@ import Token (Id)
 -- Sugar @ AST and in Case expressions in the @ Expr @ AST.
 data Patt = ValP (LitB Patt)
           | VarP Id
-          | CtrP Id [Patt]
-          | OffsetP Patt Double
             deriving (Eq, Show)
 
 -- | A functor whose least-fixed point is isomorphic to @ Patt @.
 data PattB a = ValPB (LitB a)
              | VarPB Id
-             | CtrPB Id [a]
-             | OffsetPB a Double
                deriving ( Eq
                         , Ord
                         , Show
@@ -59,8 +55,6 @@ type instance Base Patt = PattB
 instance Foldable Patt where
   project (ValP s)      = ValPB s
   project (VarP x)      = VarPB x
-  project (CtrP c ps)   = CtrPB c ps
-  project (OffsetP p n) = OffsetPB p n
 
 instance EmbedsLit Patt where
   embedLit = ValP
