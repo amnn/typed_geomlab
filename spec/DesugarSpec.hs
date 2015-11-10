@@ -63,20 +63,20 @@ spec = do
   desugarFile "test/list_comp.geom" $
     map Eval $
       [ AppE (FreeE "_mapa") [ FnE 2
-                                 (LitE (ConsB (VarE 2) (VarE 1)))
+                                 (consB (VarE 2) (VarE 1))
                              , AppE (FreeE "_range") [FreeE "a", FreeE "b"]
-                             , LitE NilB
+                             , nilB
                              ]
 
-      , AppE (FreeE "_mapa") [ FnE 2 -- ["as","acc"]
+      , AppE (FreeE "_mapa") [ FnE 2
                                  (CaseE (VarE 2)
-                                    [ ( ValPB (ConsB () ()) -- (ConsB "b" "bs")
+                                    [ ( ValPB (ConsB () ())
                                       , CaseE (VarE 1)
-                                          [ ( ValPB (ConsB () ()) -- (ConsB "c" "cs")
+                                          [ ( ValPB (ConsB () ())
                                             , CaseE (VarE 1)
                                                 [ ( ValPB NilB
                                                   , IfE (FreeE "y")
-                                                      (LitE (ConsB (VarE 4) (VarE 5)))
+                                                      (consB (VarE 4) (VarE 5))
                                                       (VarE 5)
                                                   )
                                                 , ( VarPB "_", FallThroughE)
@@ -88,7 +88,7 @@ spec = do
                                     , ( VarPB "_", VarE 2)
                                     ])
                              , FreeE "xs"
-                             , LitE NilB
+                             , nilB
                              ]
 
       , AppE (FreeE "_mapa")
@@ -101,10 +101,8 @@ spec = do
                              [ ( ValPB NilB
                                , AppE (FreeE "_mapa")
                                    [ FnE 2
-                                       (LitE (ConsB (LitE (ConsB (VarE 6)
-                                                                 (LitE (ConsB (VarE 2)
-                                                                              (LitE NilB)))))
-                                                    (VarE 1)))
+                                       (consB (consB (VarE 6) (consB (VarE 2) nilB))
+                                              (VarE 1))
                                    , FreeE "ys"
                                    , VarE 5
                                    ]
@@ -118,10 +116,54 @@ spec = do
                  , ( VarPB "_", VarE 2)
                  ])
           , FreeE "xs"
-          , LitE NilB
+          , nilB
           ]
       ]
 
   desugarFile "test/empty.geom" $
     [ Def "foo" (FnE 0 (IfE (FreeE "true") (numB 1) (numB 2)))
+    ]
+
+  desugarFile "test/folds.geom" $
+    [ Def "foldr" (FnE 3
+                     (CaseE (VarE 1)
+                        [ ( ValPB NilB, VarE 2)
+                        , ( ValPB (ConsB () ())
+                          , AppE (VarE 5) [VarE 2, AppE (FreeE "foldr") [VarE 5, VarE 4, VarE 1]]
+                          )
+                        , (VarPB "_", FailE)
+                        ]))
+
+    , Def "foldl" (FnE 3
+                     (CaseE (VarE 1)
+                       [ ( ValPB NilB, VarE 2)
+                       , ( ValPB (ConsB () ())
+                         , AppE (FreeE "foldl") [VarE 5, AppE (VarE 5) [VarE 4, VarE 2], VarE 1]
+                         )
+                       , (VarPB "_",FailE)
+                       ]))
+
+    , Def "map" (FnE 2
+                   (LetE
+                      (FnE 2
+                         (AppE (FreeE ":") [AppE (VarE 5) [VarE 2], VarE 1]))
+                      (AppE (FreeE "foldr") [VarE 1, nilB, VarE 2])))
+
+    , Def "filter" (FnE 2
+                      (LetE
+                         (FnE 2
+                            (IfE (AppE (VarE 5) [VarE 2])
+                               (AppE (FreeE ":") [VarE 2, VarE 1])
+                               (VarE 1)))
+                         (AppE (FreeE "foldr") [VarE 1, nilB, VarE 2])))
+
+    , Def "length" (FnE 1
+                      (LetE
+                        (FnE 2 (AppE (FreeE "+") [numB 1.0, VarE 1]))
+                        (AppE (FreeE "foldl") [VarE 1, numB 0.0, VarE 2])))
+
+    , Def "reverse" (FnE 1
+                       (LetE
+                         (FnE 2 (AppE (FreeE ":") [VarE 1, VarE 2]))
+                         (AppE (FreeE "foldl") [VarE 1, nilB, VarE 2])))
     ]

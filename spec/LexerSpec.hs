@@ -85,3 +85,51 @@ spec = do
     , VBar, Ident "foo", LPar, RPar, BinOp "=", Num 2.0
     , Semi
     ]
+
+  lexFile "test/folds.geom" $
+    [ Define
+    , Ident "foldr", LPar , Ident "f", Comma , Ident "e", Comma
+    , Bra, Ket, RPar, BinOp "=" , Ident "e", VBar
+    , Ident "foldr", LPar , Ident "f", Comma , Ident "e", Comma
+    , Ident "x", BinOp ":", Ident "xs", RPar, BinOp "="
+    , Ident "f", LPar, Ident "x"
+    , Comma, Ident "foldr", LPar, Ident "f", Comma, Ident "e", Comma, Ident "xs", RPar
+    , RPar, Semi
+
+    , Define
+    , Ident "foldl", LPar , Ident "f", Comma , Ident "e", Comma
+    , Bra, Ket, RPar, BinOp "=" , Ident "e", VBar
+    , Ident "foldl", LPar , Ident "f", Comma , Ident "e", Comma
+    , Ident "x", BinOp ":", Ident "xs", RPar, BinOp "="
+    , Ident "foldl", LPar, Ident "f"
+    , Comma, Ident "f", LPar, Ident "e", Comma, Ident "x", RPar
+    , Comma, Ident "xs", RPar, Semi
+
+    , Define
+    , Ident "map", LPar, Ident "f", Comma, Ident "xs", RPar, BinOp "="
+    , Let
+    , Ident "app", LPar, Ident "x", Comma, Ident "ys", RPar, BinOp "="
+    , Ident "f", LPar, Ident "x", RPar, BinOp ":", Ident "ys", In
+    , Ident "foldr", LPar, Ident "app", Comma, Bra, Ket, Comma, Ident "xs", RPar, Semi
+
+    , Define
+    , Ident "filter", LPar, Ident "p", Comma, Ident "xs", RPar, BinOp "="
+    , Let
+    , Ident "test", LPar, Ident "x", Comma, Ident "ys", RPar, BinOp "="
+    , Ident "x", BinOp ":", Ident "ys", When, Ident "p", LPar, Ident "x", RPar, VBar
+    , Ident "test", LPar, Anon, Comma, Ident "ys", RPar, BinOp "="
+    , Ident "ys", In
+    , Ident "foldr", LPar, Ident "test", Comma, Bra, Ket, Comma, Ident "xs", RPar, Semi
+
+    , Define
+    , Ident "length", LPar, Ident "xs", RPar, BinOp "="
+    , Let, Ident "plus1", LPar, Anon, Comma, Ident "x", RPar, BinOp "="
+    , Num 1.0, BinOp "+", Ident "x", In
+    , Ident "foldl", LPar, Ident "plus1", Comma, Num 0.0, Comma, Ident "xs", RPar, Semi
+
+    , Define
+    , Ident "reverse", LPar, Ident "xs", RPar, BinOp "="
+    , Let, Ident "snoc", LPar, Ident "x", Comma, Ident "y", RPar, BinOp "="
+    , Ident "y", BinOp ":", Ident "x", In
+    , Ident "foldl", LPar, Ident "snoc", Comma, Bra, Ket, Comma, Ident "xs", RPar, Semi
+    ]

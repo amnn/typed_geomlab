@@ -88,3 +88,60 @@ spec = do
                      , FnArm "foo" [] (numB 2.0) Nothing
                      ])
     ]
+
+  parseFile "test/folds.geom" $
+    [ Def "foldr" (FnS [ FnArm "foldr" [VarP "f", VarP "e", ValP NilB]
+                           (VarS "e")
+                           Nothing
+                       , FnArm "foldr" [VarP "f", VarP "e", consB (VarP "x") (VarP "xs")]
+                           (AppS "f" [VarS "x",AppS "foldr" [VarS "f", VarS "e", VarS "xs"]])
+                           Nothing
+                       ])
+
+    , Def "foldl" (FnS [ FnArm "foldl" [VarP "f", VarP "e", ValP NilB]
+                           (VarS "e")
+                           Nothing
+                       , FnArm "foldl" [VarP "f", VarP "e", consB (VarP "x") (VarP "xs")]
+                           (AppS "foldl" [VarS "f", AppS "f" [VarS "e", VarS "x"], VarS "xs"])
+                           Nothing
+                       ])
+
+    , Def "map" (FnS [ FnArm "map" [VarP "f",VarP "xs"]
+                         (LetS "app" (FnS [ FnArm "app" [VarP "x", VarP "ys"]
+                                              (AppS ":" [AppS "f" [VarS "x"],VarS "ys"])
+                                              Nothing
+                                          ])
+                            (AppS "foldr" [VarS "app", nilB, VarS "xs"]))
+                         Nothing
+                     ])
+
+    , Def "filter" (FnS [ FnArm "filter" [VarP "p", VarP "xs"]
+                            (LetS "test" (FnS [ FnArm "test" [VarP "x", VarP "ys"]
+                                                  (AppS ":" [VarS "x", VarS "ys"])
+                                                  (Just (AppS "p" [VarS "x"]))
+                                              , FnArm "test" [VarP "_", VarP "ys"]
+                                                  (VarS "ys")
+                                                  Nothing
+                                              ])
+                               (AppS "foldr" [VarS "test", nilB,VarS "xs"]))
+                            Nothing
+                        ])
+
+    , Def "length" (FnS [ FnArm "length" [VarP "xs"]
+                            (LetS "plus1" (FnS [ FnArm "plus1" [VarP "_", VarP "x"]
+                                                   (AppS "+" [numB 1.0, VarS "x"])
+                                                   Nothing
+                                               ])
+                               (AppS "foldl" [VarS "plus1", numB 0.0, VarS "xs"]))
+                            Nothing
+                        ])
+
+    , Def "reverse" (FnS [ FnArm "reverse" [VarP "xs"]
+                             (LetS "snoc" (FnS [ FnArm "snoc" [VarP "x", VarP "y"]
+                                                   (AppS ":" [VarS "y", VarS "x"])
+                                                   Nothing
+                                               ])
+                                (AppS "foldl" [VarS "snoc", nilB, VarS "xs"]))
+                             Nothing
+                         ])
+    ]
