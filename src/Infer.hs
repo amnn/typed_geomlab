@@ -352,7 +352,7 @@ typeCheck ps = runST $ do
   tyCtx   <- newArray_ 4
   isRef   <- newSTRef $ IS {tyCtx, waitingToAdjust = [], nextTyVar = 0}
   gloDefs <- initialDefs
-  snd <$> foldM (tcPara isRef) (gloDefs, []) ps
+  reverse . snd <$> foldM (tcPara isRef) (gloDefs, []) ps
   where
     tcPara isRef (gloDefs, ts) (Eval e)  = do
       etr <- typeOf gloDefs isRef 0 e
