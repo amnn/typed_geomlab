@@ -3,6 +3,7 @@ module Main where
 import Control.Monad ()
 import Desugar (desugarExpr)
 import GLParser (parseExpr)
+import Infer (typeCheck)
 import Lexer
 import System.Environment
 import Token
@@ -19,7 +20,6 @@ scanTokens = runAndFormat (putStrLn . unwords . map show) loop
               else do rest <- loop
                       return (t:rest)
 
-
 parse :: String -> IO ()
 parse = runAndFormat (mapM_ print) parseExpr
 
@@ -29,18 +29,21 @@ desugar = runAndFormat (mapM_ print) desugarM
     desugarM = do { s <- parseExpr; return (applyDesugar s) }
     applyDesugar = map (fmap desugarExpr)
 
+tc :: String -> IO ()
+tc = runAndFormat (mapM_ print) tcM
+  where
+    tcM = typeCheck . map (fmap desugarExpr) <$> parseExpr
+
 processFile :: String -> IO ()
 processFile fname = do
   putStrLn ("\n\nFile: " ++ fname ++ "\n")
   input <- readFile fname
   putStrLn "*** Raw ***\n"
   putStrLn input
-  putStrLn "*** Scanned  ***\n"
-  scanTokens input
-  putStrLn "\n*** Parsed ***\n"
-  parse input
   putStrLn "\n*** Desugared  ***\n"
   desugar input
+  putStrLn "\n*** Type Checked ***\n"
+  tc input
 
 main :: IO ()
 main = do

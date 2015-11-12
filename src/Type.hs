@@ -1,38 +1,25 @@
-{-# LANGUAGE TypeFamilies, DeriveFunctor #-}
+{-# LANGUAGE TypeFamilies, DeriveFoldable, DeriveFunctor, DeriveTraversable, FlexibleInstances #-}
+
 module Type where
 
 import Prelude hiding (Foldable)
-import Data.Functor.Foldable
+import Data.Foldable
 import Data.List (intercalate)
 import Token (Id)
 
-data Ty = BoolT | NumT | StrT | AtomT | VarT Id
-        | ListT Ty | AppT [Ty] Ty
-          deriving (Eq)
+data TyB v a = BoolTB | NumTB | StrTB | AtomTB | VarTB v
+             | ListTB a | ArrTB [a] a
+               deriving (Eq, Show, Foldable, Functor, Traversable)
 
-data TyB a = BoolTB | NumTB | StrTB | AtomTB | VarTB Id
-           | ListTB a | AppTB [a] a
-             deriving (Eq, Show, Functor)
-
-
-type instance Base Ty = TyB
-instance Foldable Ty where
-  project BoolT       = BoolTB
-  project NumT        = NumTB
-  project StrT        = StrTB
-  project AtomT       = AtomTB
-  project (VarT x)    = VarTB x
-  project (ListT t)   = ListTB t
-  project (AppT as b) = AppTB as b
-
-instance Show Ty where
-  show BoolT       = "bool"
-  show NumT        = "num"
-  show StrT        = "str"
-  show AtomT       = "atom"
-  show (VarT x)    = "'" ++ x
-  show (ListT t)   = "[" ++ show t ++ "]"
-  show (AppT as b) = showFormals as ++ " -> " ++ show b
+newtype FixTy = FixTy { unfixTy :: TyB Id FixTy }
+instance Show FixTy where
+  show (FixTy BoolTB)       = "bool"
+  show (FixTy NumTB)        = "num"
+  show (FixTy StrTB)        = "str"
+  show (FixTy AtomTB)       = "atom"
+  show (FixTy (VarTB x))    = "'" ++ x
+  show (FixTy (ListTB t))   = "[" ++ show t ++ "]"
+  show (FixTy (ArrTB as b)) = showFormals as ++ " -> " ++ show b
     where
       showFormals [f] = show f
       showFormals fs = "(" ++  intercalate ", " (map show fs) ++ ")"

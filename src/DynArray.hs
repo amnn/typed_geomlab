@@ -42,10 +42,10 @@ fetch (DA ref) i = do
   STA.readArray (buf arr) i
 
 -- | Access the last element in the array.
-peek :: DynArray s e -> ST s e
-peek (DA ref) = do
+peek :: Int -> DynArray s e -> ST s e
+peek off (DA ref) = do
   DArray {buf, size} <- readSTRef ref
-  STA.readArray buf (size - 1)
+  STA.readArray buf (size - off)
 
 -- | Remove the last element in the array. This could cause the array to become
 -- compacted.
@@ -58,7 +58,7 @@ pop (DA ref) = do
 
 -- | Variant of @ pop @ that returns the last element as well as removing it.
 pop' :: DynArray s e -> ST s e
-pop' d = do { x <- peek d; pop d; return x }
+pop' d = do { x <- peek 1 d; pop d; return x }
 
 -- | Append an element to the end of the array. This could trigger an array
 -- expansion.

@@ -11,7 +11,7 @@ spec = do
     it "adds elements" $ do
       let res = runST $ do { d <- newArray_ 10
                            ; push d 1
-                           ; peek d
+                           ; peek 1 d
                            }
       (res :: Int) `shouldBe` 1
 
@@ -20,7 +20,7 @@ spec = do
       let res = runST $ do { d <- newArray_ 4
                            ; forM_ [1..3] (push d)
                            ; pop d
-                           ; peek d
+                           ; peek 1 d
                            }
       (res :: Int) `shouldBe` 2
 
@@ -45,6 +45,6 @@ spec = do
       let res = runST $ do { d <- newArray_ 8
                            ; forM_ [1..8] (push d)
                            ; replicateM_ 7 (pop d)
-                           ; peek d
+                           ; peek 1 d
                            }
       (res :: Int) `shouldBe` 1
