@@ -16,7 +16,7 @@ import Sugar
 import Test.Hspec
 import Test.HUnit (assertFailure)
 import Token
-import Type (FixTy, alphaEq)
+import Type (Ty, alphaEq)
 
 lexFile :: FilePath -> [Token] -> Spec
 lexFile = testFile "lexes" (==) scanTokens
@@ -27,7 +27,7 @@ parseFile = testFile "parses" (==) parse
 desugarFile :: FilePath -> [Para Expr] -> Spec
 desugarFile = testFile "desugars" (==) desugar
 
-typeCheckFile :: FilePath -> [FixTy] -> Spec
+typeCheckFile :: FilePath -> [Ty Id] -> Spec
 typeCheckFile = testFile "type checks" paraEq tc
   where
     paraEq u v = and (zipWith alphaEq u v)
@@ -51,7 +51,7 @@ desugar input = return (runAlex input pAndDExpr)
   where
     pAndDExpr = parseExpr >>= return . map (fmap desugarExpr)
 
-tc :: String -> Result [FixTy]
+tc :: String -> Result [Ty Id]
 tc input = return (runAlex input pDAndTCExpr)
   where
     pDAndTCExpr = parseExpr >>= return . typeCheck . map (fmap desugarExpr)

@@ -341,26 +341,26 @@ typeOf gloDefs isRef = check
       unify isRef ltr ttr
       return ltr
 
-resolveTyRef :: TyRef s -> ST s FixTy
+resolveTyRef :: TyRef s -> ST s (Ty Id)
 resolveTyRef tr = do
   StratTy{ty} <- readSTRef =<< repr tr
   case ty of
-    VarTB (FreeV n) -> return $ FixTy (VarTB n)
+    VarTB (FreeV n) -> return $ VarT n
     VarTB (FwdV  _) -> error "resolveTyRef: forward pointer!"
 
-    BoolTB          -> return $ FixTy BoolTB
-    NumTB           -> return $ FixTy NumTB
-    StrTB           -> return $ FixTy StrTB
-    AtomTB          -> return $ FixTy AtomTB
-    ListTB t        -> FixTy . ListTB <$> resolveTyRef t
-    ArrTB as b      -> FixTy <$> (ArrTB <$> mapM resolveTyRef as <*> resolveTyRef b)
+    BoolTB          -> return $ BoolT
+    NumTB           -> return $ NumT
+    StrTB           -> return $ StrT
+    AtomTB          -> return $ AtomT
+    ListTB t        -> ListT <$> resolveTyRef t
+    ArrTB as b      -> ArrT <$> mapM resolveTyRef as <*> resolveTyRef b
 
-abstractTy :: FixTy -> ST s (TyRef s)
-abstractTy ft = do
+abstractTy :: (Ty Id) -> ST s (TyRef s)
+abstractTy ty = do
   sr <- newSTRef H.empty
-  absT sr ft
+  absT sr ty
   where
-    absT sr (FixTy (VarTB n)) = do
+    absT sr (VarT n) = do
       subst <- readSTRef sr
       case H.lookup n subst of
         Just vr -> return vr
@@ -369,12 +369,12 @@ abstractTy ft = do
           modifySTRef sr (H.insert n vr)
           return vr
 
-    absT _  (FixTy BoolTB)       = genTy $ BoolTB
-    absT _  (FixTy NumTB)        = genTy $ NumTB
-    absT _  (FixTy StrTB)        = genTy $ StrTB
-    absT _  (FixTy AtomTB)       = genTy $ AtomTB
-    absT sr (FixTy (ListTB t))   = absT sr t >>= genTy . ListTB
-    absT sr (FixTy (ArrTB as b)) = do
+    absT _  BoolT       = genTy $ BoolTB
+    absT _  NumT        = genTy $ NumTB
+    absT _  StrT        = genTy $ StrTB
+    absT _  AtomT       = genTy $ AtomTB
+    absT sr (ListT t)   = absT sr t >>= genTy . ListTB
+    absT sr (ArrT as b) = do
       atrs <- mapM (absT sr) as
       bs   <- absT sr b
       genTy (ArrTB atrs bs)
@@ -383,22 +383,19 @@ initialDefs :: ST s (H.Map Id (TyRef s))
 initialDefs = H.fromList <$> mapM absDef ts
   where
     absDef (n, ty) = do { tr <- abstractTy ty; return (n, tr) }
-    ts = [ ("+", FixTy (ArrTB [FixTy NumTB, FixTy NumTB] (FixTy NumTB)))
-         , ("-", FixTy (ArrTB [FixTy NumTB, FixTy NumTB] (FixTy NumTB)))
-         , ("*", FixTy (ArrTB [FixTy NumTB, FixTy NumTB] (FixTy NumTB)))
-         , ("/", FixTy (ArrTB [FixTy NumTB, FixTy NumTB] (FixTy NumTB)))
-         , ("~", FixTy (ArrTB [FixTy NumTB] (FixTy NumTB)))
-         , ("int", FixTy (ArrTB [FixTy NumTB] (FixTy NumTB)))
-         , ("numeric", FixTy (ArrTB [FixTy NumTB] (FixTy BoolTB)))
-         , (":", FixTy (ArrTB [FixTy (VarTB "a"), FixTy (ListTB (FixTy (VarTB "a")))] (FixTy (ListTB (FixTy (VarTB "a"))))))
-         , ("true",  FixTy BoolTB)
-         , ("false", FixTy BoolTB)
-         , (">", FixTy (ArrTB [FixTy (VarTB "a"), FixTy (VarTB "a")] (FixTy BoolTB)))
-         , ("<", FixTy (ArrTB [FixTy (VarTB "a"), FixTy (VarTB "a")] (FixTy BoolTB)))
-         , ("=", FixTy (ArrTB [FixTy (VarTB "a"), FixTy (VarTB "a")] (FixTy BoolTB)))
+    numBOp i = (i, ArrT [NumT, NumT] NumT)
+    numMOp i = (i, ArrT [NumT] NumT)
+    relBOp i = (i, ArrT [VarT "a", VarT "a"] BoolT)
+    ts = (numBOp <$> ["+", "-", "*", "/"])
+      ++ (numMOp <$> ["~", "int"])
+      ++ (relBOp <$> ["<", "<=", "<>", "=", ">=", ">"])
+      ++ [ ("numeric", ArrT [NumT] BoolT)
+         , (":",       ArrT [VarT "a", ListT (VarT "a")] (ListT (VarT "a")))
+         , ("true",    BoolT)
+         , ("false",   BoolT)
          ]
 
-typeCheck :: [Para Expr] -> [FixTy]
+typeCheck :: [Para Expr] -> [Ty Id]
 typeCheck ps = runST $ do
   tyCtx   <- newArray_ 4
   isRef   <- newSTRef $ IS {tyCtx, waitingToAdjust = [], nextTyVar = 0}

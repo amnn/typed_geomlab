@@ -6,16 +6,11 @@ import Type
 spec :: Spec
 spec = do
   typeCheckFile "test/compose.geom" $
-    [ (FixTy (ArrTB [ FixTy (ArrTB [ FixTy (VarTB "b")]
-                                   ( FixTy (VarTB "c")))
-                    , FixTy (ArrTB [ FixTy (VarTB "a")]
-                                   ( FixTy (VarTB "b")))
-                    ]
-                    (  FixTy (ArrTB [ FixTy (VarTB "a")]
-                                    ( FixTy (VarTB "c"))))))
-    , FixTy (ArrTB [ FixTy NumTB]
-                   ( FixTy NumTB))
+    [ ArrT [ ArrT [VarT "b"] (VarT "c")
+           , ArrT [VarT "a"] (VarT "b")
+           ]
+           ( ArrT [VarT "a"] (VarT "c"))
 
-    , FixTy (ArrTB [ FixTy NumTB]
-                   ( FixTy NumTB))
+    , ArrT [NumT] NumT
+    , ArrT [NumT] NumT
     ]

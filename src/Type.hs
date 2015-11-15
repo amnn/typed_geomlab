@@ -8,40 +8,56 @@
 module Type where
 
 import Prelude hiding (Foldable)
-import Data.Foldable
+import qualified Prelude as P (Foldable)
+import Data.Foldable (toList)
 import Data.Function (on)
+import Data.Functor.Foldable
 import qualified Data.HashMap as H
 import Data.List (intercalate)
 import Data.Traversable (mapAccumL)
 import Structure (shapeEq)
 import Token (Id)
 
-data TyB v a = BoolTB | NumTB | StrTB | AtomTB | VarTB v
-             | ListTB a | ArrTB [a] a
-               deriving (Eq, Show, Foldable, Functor, Traversable)
+data Ty v    = BoolT | NumT | StrT | AtomT | VarT v | ListT (Ty v) | ArrT [Ty v] (Ty v)
+               deriving Eq
 
-newtype FixTy = FixTy { unfixTy :: TyB Id FixTy }
-instance Show FixTy where
-  show (FixTy BoolTB)       = "bool"
-  show (FixTy NumTB)        = "num"
-  show (FixTy StrTB)        = "str"
-  show (FixTy AtomTB)       = "atom"
-  show (FixTy (VarTB x))    = "'" ++ x
-  show (FixTy (ListTB t))   = "[" ++ show t ++ "]"
-  show (FixTy (ArrTB as b)) = showFormals as ++ " -> " ++ show b
+data TyB v a = BoolTB | NumTB | StrTB | AtomTB | VarTB v | ListTB a | ArrTB [a] a
+               deriving (Eq, Show, P.Foldable, Functor, Traversable)
+
+type instance Base (Ty v) = TyB v
+instance Foldable (Ty v) where
+  project BoolT       = BoolTB
+  project NumT        = NumTB
+  project StrT        = StrTB
+  project AtomT       = AtomTB
+  project (VarT v)    = VarTB v
+  project (ListT t)   = ListTB t
+  project (ArrT as a) = ArrTB as a
+
+instance Show (Ty Id) where
+  show BoolT       = "bool"
+  show NumT        = "num"
+  show StrT        = "str"
+  show AtomT       = "atom"
+  show (VarT x)    = "'" ++ x
+  show (ListT t)   = "[" ++ show t ++ "]"
+  show (ArrT as b) = showFormals as ++ " -> " ++ show b
     where
       showFormals [f] = show f
       showFormals fs = "(" ++  intercalate ", " (map show fs) ++ ")"
 
-alphaEq :: FixTy -> FixTy -> Bool
+alphaEq :: Ty Id -> Ty Id -> Bool
 alphaEq t u = snd $ eq H.empty t u
   where
-    eq subst (FixTy (VarTB v)) (FixTy (VarTB w))
+    eq subst (VarT v) (VarT w)
       | Just x <- H.lookup v subst = (subst, x == w)
       | otherwise                  = (H.insert v w subst, True)
 
-    eq subst (FixTy v) (FixTy w)
-      | v `shapeEq` w =
-        let (subst', vs) = mapAccumL (uncurry . eq) subst $ (zip `on` toList) v w
+    eq subst v w
+      | pv `shapeEq` pw =
+        let (subst', vs) = mapAccumL (uncurry . eq) subst $ (zip `on` toList) pv pw
         in (subst', and vs)
       | otherwise     = (subst, False)
+        where
+         pv = project v
+         pw = project w
