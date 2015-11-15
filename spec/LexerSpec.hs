@@ -162,3 +162,15 @@ spec = do
     , Ident "x", BinOp ":", Ident "y", In
     , Ident "foldl", LPar, Ident "snoc", Comma, Bra, Ket, Comma, Ident "xs", RPar, Semi
     ]
+
+  lexFile "test/let_gen.geom" $
+    [ Define, Ident "id", LPar, Ident "x", RPar, BinOp "=", Ident "x", Semi
+
+    , Let, Ident "i"
+    , BinOp "=", Ident "id", LPar, Ident "id", RPar
+    , In, Ident "i", LPar, Num 1, RPar, Semi
+
+    , Let, Ident "f", LPar, Ident "x", RPar, BinOp "=", Ident "x", In
+    , Let, Ident "g", BinOp "=", Ident "f", LPar, Ident "f", RPar, In
+    , Ident "g", LPar, Atom "foo", RPar, Semi
+    ]

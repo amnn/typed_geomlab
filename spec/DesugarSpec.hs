@@ -193,3 +193,14 @@ spec = do
                          (FnE 2 (AppE (FreeE ":") [VarE 1, VarE 2]))
                          (AppE (FreeE "foldl") [VarE 1, nilB, VarE 2])))
     ]
+
+  desugarFile "test/let_gen.geom" $
+    [ Def "id" (FnE 1 (VarE 1))
+
+    , Eval (LetE (AppE (FreeE "id") [FreeE "id"])
+              (AppE (VarE 1) [numB 1]))
+
+    , Eval (LetE (FnE 1 (VarE 1))
+              (LetE (AppE (VarE 2) [VarE 2])
+                 (AppE (VarE 1) [atomB "foo"])))
+    ]

@@ -172,3 +172,13 @@ spec = do
                              Nothing
                          ])
     ]
+
+  parseFile "test/let_gen.geom" $
+    [ Def "id" (FnS [ FnArm "id" [VarP "x"] (VarS "x") Nothing])
+
+    , Eval (LetS "i" (AppS "id" [VarS "id"]) (AppS "i" [numB 1]))
+
+    , Eval (LetS "f" (FnS [ FnArm "f" [VarP "x"] (VarS "x") Nothing])
+              (LetS "g" (AppS "f" [VarS "f"])
+                 (AppS "g" [atomB "foo"])))
+    ]
