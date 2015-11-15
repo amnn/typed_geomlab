@@ -127,9 +127,12 @@ updateLevel isRef lvl tr = do
   StratTy{ty, newLevel, oldLevel} <- readSTRef tr
   case ty of
     VarTB (FreeV _)
-      | Just lvl'@(Lvl _) <- newLevel -> do
+      | Just lvl'@(Lvl _) <- newLevel ->
         when (lvl < lvl') $ setLevel tr lvl
-        return ()
+
+    _ | Just lvl'@(Lvl _) <- newLevel
+      , length ty == 0 ->
+        when (lvl < lvl') $ setLevel tr lvl
 
     _ | Nothing           <- newLevel -> error "cycle: occurs check"
     _ | Just lvl'@(Lvl _) <- newLevel -> do
@@ -217,7 +220,7 @@ generalise isRef lvl tr = do
             | otherwise -> do
             reps <- mapM repr ty
             mapM_ gen reps
-            lvls <- mapM getLevel ty
+            lvls <- mapM getLevel reps
             let maxLvl = maximum lvls
             unifyLevels _ur maxLvl
 
@@ -282,7 +285,7 @@ typeOf gloDefs isRef = check
       return rtr
 
     check lvl (LetE a b) = do
-      ltr <- pushLocal isRef lvl
+      ltr <- pushLocal isRef (lvl+1)
       check (lvl+1) a >>= unify isRef ltr
       generalise isRef lvl ltr
       btr <- check lvl b
