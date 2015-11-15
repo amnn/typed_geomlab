@@ -3,17 +3,20 @@ module SpecHelper
        , lexFile
        , parseFile
        , desugarFile
+       , typeCheckFile
        ) where
 
 import Control.Monad (unless)
 import Desugar (desugarExpr)
 import Expr
 import GLParser (parseExpr)
+import Infer (typeCheck)
 import Lexer
 import Sugar
 import Test.Hspec
 import Test.HUnit (assertFailure)
 import Token
+import Type (FixTy, alphaEq)
 
 lexFile :: FilePath -> [Token] -> Spec
 lexFile = testFile "lexes" (==) scanTokens
@@ -23,6 +26,11 @@ parseFile = testFile "parses" (==) parse
 
 desugarFile :: FilePath -> [Para Expr] -> Spec
 desugarFile = testFile "desugars" (==) desugar
+
+typeCheckFile :: FilePath -> [FixTy] -> Spec
+typeCheckFile = testFile "type checks" paraEq tc
+  where
+    paraEq u v = and (zipWith alphaEq u v)
 
 type Result a = IO (Either String a)
 
@@ -38,10 +46,15 @@ scanTokens input = return (runAlex input loop)
 parse :: String -> Result [Para Sugar]
 parse input = return (runAlex input parseExpr)
 
-desugar :: FilePath -> Result [Para Expr]
+desugar :: String -> Result [Para Expr]
 desugar input = return (runAlex input pAndDExpr)
   where
     pAndDExpr = parseExpr >>= return . map (fmap desugarExpr)
+
+tc :: String -> Result [FixTy]
+tc input = return (runAlex input pDAndTCExpr)
+  where
+    pDAndTCExpr = parseExpr >>= return . typeCheck . map (fmap desugarExpr)
 
 testFile :: Show a
          => String
