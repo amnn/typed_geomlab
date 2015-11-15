@@ -36,8 +36,10 @@ spec = do
                                    ])
                          Nothing
                      ])
+    , Def "a" (numB 10)
+    , Def "b" (numB 4)
     , Eval (AppS "div" [VarS "a", VarS "b"])
-    , Eval (AppS "mod" [VarS "c", VarS "d"])
+    , Eval (AppS "mod" [VarS "a", VarS "b"])
     ]
 
   parseFile "test/monop_fn.geom" $
@@ -47,7 +49,8 @@ spec = do
     ]
 
   parseFile "test/neg.geom" $
-    [ Eval (AppS "~" [AppS "~" [numB 10.0]])
+    [ Def "x" (numB 1)
+    , Eval (AppS "~" [AppS "~" [numB 10.0]])
     , Eval (AppS "+" [ numB 1
                      , AppS "~" [ AppS "+" [ VarS "x"
                                            , numB 1.0
@@ -70,18 +73,42 @@ spec = do
     ]
 
   parseFile "test/list_comp.geom" $
-    map Eval $
-      [ ListCompS (VarS "x")
-          [ GenB (VarP "x") (RangeS (VarS "a") (VarS "b")) ]
-      , ListCompS (VarS "x")
-          [ GenB (enlist [VarP "_", VarP "x"]) (VarS "xs")
-          , FilterB (VarS "y")
-          ]
-      , ListCompS (enlist [VarS "y", VarS "x"])
-          [ GenB (enlist [VarP "_", VarP "x"]) (VarS "xs")
-          , GenB (VarP "y") (VarS "ys")
-          ]
-      ]
+    [ Def "_mapa" (FnS [ FnArm "_mapa" [VarP "f", nilB, VarP "acc"]
+                           (VarS "acc")
+                           Nothing
+                       , FnArm "_mapa" [VarP "f", consB (VarP "x") (VarP "xs"), VarP "acc"]
+                           (AppS "f" [VarS "x", AppS "_mapa" [VarS "f", VarS "xs", VarS "acc"]])
+                           Nothing
+                       ])
+
+    , Def "_range" (FnS [ FnArm "_range" [VarP "a", VarP "b"]
+                            (IfS (AppS ">" [VarS "a", VarS "b"])
+                                nilB
+                                (AppS ":" [ (VarS "a")
+                                          , (AppS "_range" [ AppS "+" [VarS "a", numB 1]
+                                                           , VarS "b"
+                                                           ])
+                                          ]))
+                            Nothing
+                        ])
+
+    , Def "a"  (numB 1)
+    , Def "b"  (numB 10)
+    , Def "xs" (consB (consB (strB "foo") (consB (strB "bar") nilB)) nilB)
+    , Def "ys" (consB (strB "qux") (consB (strB "quux") nilB))
+    , Def "y"  (AppS "numeric" [numB 0])
+
+    , Eval (ListCompS (VarS "x")
+              [ GenB (VarP "x") (RangeS (VarS "a") (VarS "b")) ])
+    , Eval (ListCompS (VarS "x")
+              [ GenB (enlist [VarP "_", VarP "x"]) (VarS "xs")
+              , FilterB (VarS "y")
+              ])
+    , Eval (ListCompS (enlist [VarS "y", VarS "x"])
+              [ GenB (enlist [VarP "_", VarP "x"]) (VarS "xs")
+              , GenB (VarP "y") (VarS "ys")
+              ])
+    ]
 
   parseFile "test/empty.geom" $
     [ Def "foo" (FnS [ FnArm "foo" [] (numB 1.0) (Just (VarS "true"))
@@ -128,7 +155,7 @@ spec = do
                         ])
 
     , Def "length" (FnS [ FnArm "length" [VarP "xs"]
-                            (LetS "plus1" (FnS [ FnArm "plus1" [VarP "_", VarP "x"]
+                            (LetS "plus1" (FnS [ FnArm "plus1" [VarP "x", VarP "_"]
                                                    (AppS "+" [numB 1.0, VarS "x"])
                                                    Nothing
                                                ])
@@ -137,8 +164,8 @@ spec = do
                         ])
 
     , Def "reverse" (FnS [ FnArm "reverse" [VarP "xs"]
-                             (LetS "snoc" (FnS [ FnArm "snoc" [VarP "x", VarP "y"]
-                                                   (AppS ":" [VarS "y", VarS "x"])
+                             (LetS "snoc" (FnS [ FnArm "snoc" [VarP "y", VarP "x"]
+                                                   (AppS ":" [VarS "x", VarS "y"])
                                                    Nothing
                                                ])
                                 (AppS "foldl" [VarS "snoc", nilB, VarS "xs"]))

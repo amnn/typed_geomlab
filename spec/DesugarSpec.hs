@@ -25,8 +25,11 @@ spec = do
                                                         ]
                                      ]))
 
+    , Def "a" (numB 10)
+    , Def "b" (numB 4)
+
     , Eval (AppE (FreeE "div") [FreeE "a", FreeE "b"])
-    , Eval (AppE (FreeE "mod") [FreeE "c", FreeE "d"])
+    , Eval (AppE (FreeE "mod") [FreeE "a", FreeE "b"])
     ]
 
   desugarFile "test/monop_fn.geom" $
@@ -36,7 +39,8 @@ spec = do
     ]
 
   desugarFile "test/neg.geom" $
-    [ Eval (AppE (FreeE "~") [AppE (FreeE "~") [numB 10.0]])
+    [ Def "x" (numB 1)
+    , Eval (AppE (FreeE "~") [AppE (FreeE "~") [numB 10.0]])
     , Eval (AppE (FreeE "+") [ numB 1
                              , AppE (FreeE "~") [ AppE (FreeE "+") [ FreeE "x"
                                                                    , numB 1.0
@@ -61,64 +65,86 @@ spec = do
     ]
 
   desugarFile "test/list_comp.geom" $
-    map Eval $
-      [ AppE (FreeE "_mapa") [ FnE 2
-                                 (consB (VarE 2) (VarE 1))
-                             , AppE (FreeE "_range") [FreeE "a", FreeE "b"]
-                             , nilB
-                             ]
+    [ Def "_mapa" (FnE 3 (CaseE (VarE 2)
+                            [ ( ValPB NilB, VarE 1)
+                            , ( ValPB (ConsB () ())
+                              , AppE (VarE 5) [VarE 2, AppE (FreeE "_mapa") [VarE 5, VarE 1, VarE 3]]
+                              )
+                            , ( VarPB "_", FailE)
+                            ]))
 
-      , AppE (FreeE "_mapa") [ FnE 2
-                                 (CaseE (VarE 2)
-                                    [ ( ValPB (ConsB () ())
-                                      , CaseE (VarE 1)
-                                          [ ( ValPB (ConsB () ())
-                                            , CaseE (VarE 1)
-                                                [ ( ValPB NilB
-                                                  , IfE (FreeE "y")
-                                                      (consB (VarE 4) (VarE 5))
-                                                      (VarE 5)
-                                                  )
-                                                , ( VarPB "_", FallThroughE)
-                                                ]
-                                            )
-                                          , ( VarPB "_", FallThroughE)
-                                          ]
-                                      )
-                                    , ( VarPB "_", VarE 2)
-                                    ])
-                             , FreeE "xs"
-                             , nilB
-                             ]
+    , Def "_range" (FnE 2 (IfE (AppE (FreeE ">") [VarE 2,VarE 1])
+                             nilB
+                             (AppE (FreeE ":") [ VarE 2
+                                               , AppE (FreeE "_range")
+                                                   [ AppE (FreeE "+") [VarE 2, LitE (NumB 1.0)]
+                                                   , VarE 1
+                                                   ]
+                                               ])))
 
-      , AppE (FreeE "_mapa")
-          [ FnE 2
-              (CaseE (VarE 2)
-                 [ ( ValPB (ConsB () ())
-                   , CaseE (VarE 1)
-                       [ ( ValPB (ConsB () ())
-                         , CaseE (VarE 1)
-                             [ ( ValPB NilB
-                               , AppE (FreeE "_mapa")
-                                   [ FnE 2
-                                       (consB (consB (VarE 6) (consB (VarE 2) nilB))
-                                              (VarE 1))
-                                   , FreeE "ys"
-                                   , VarE 5
-                                   ]
-                               )
-                             , ( VarPB "_", FallThroughE)
-                             ]
-                         )
-                       , ( VarPB "_", FallThroughE)
-                       ]
-                   )
-                 , ( VarPB "_", VarE 2)
-                 ])
-          , FreeE "xs"
-          , nilB
-          ]
-      ]
+    , Def "a" (numB 1.0)
+    , Def "b" (numB 10.0)
+    , Def "xs" (consB (consB (strB "foo") (consB (strB "bar") nilB)) nilB)
+    , Def "ys" (consB (strB "qux") (consB (strB "quux") nilB))
+    , Def "y" (AppE (FreeE "numeric") [LitE (NumB 0.0)])
+
+    , Eval (AppE (FreeE "_mapa") [ FnE 2
+                                     (consB (VarE 2) (VarE 1))
+                                 , AppE (FreeE "_range") [FreeE "a", FreeE "b"]
+                                 , nilB
+                                 ])
+
+    , Eval (AppE (FreeE "_mapa") [ FnE 2
+                                     (CaseE (VarE 2)
+                                        [ ( ValPB (ConsB () ())
+                                          , CaseE (VarE 1)
+                                              [ ( ValPB (ConsB () ())
+                                                , CaseE (VarE 1)
+                                                    [ ( ValPB NilB
+                                                      , IfE (FreeE "y")
+                                                          (consB (VarE 4) (VarE 5))
+                                                          (VarE 5)
+                                                      )
+                                                    , ( VarPB "_", FallThroughE)
+                                                    ]
+                                                )
+                                              , ( VarPB "_", FallThroughE)
+                                              ]
+                                          )
+                                        , ( VarPB "_", VarE 2)
+                                        ])
+                                 , FreeE "xs"
+                                 , nilB
+                                 ])
+
+    , Eval (AppE (FreeE "_mapa")
+              [ FnE 2
+                  (CaseE (VarE 2)
+                     [ ( ValPB (ConsB () ())
+                       , CaseE (VarE 1)
+                           [ ( ValPB (ConsB () ())
+                             , CaseE (VarE 1)
+                                 [ ( ValPB NilB
+                                   , AppE (FreeE "_mapa")
+                                       [ FnE 2
+                                           (consB (consB (VarE 6) (consB (VarE 2) nilB))
+                                                  (VarE 1))
+                                       , FreeE "ys"
+                                       , VarE 5
+                                       ]
+                                   )
+                                 , ( VarPB "_", FallThroughE)
+                                 ]
+                             )
+                           , ( VarPB "_", FallThroughE)
+                           ]
+                       )
+                     , ( VarPB "_", VarE 2)
+                     ])
+              , FreeE "xs"
+              , nilB
+              ])
+    ]
 
   desugarFile "test/empty.geom" $
     [ Def "foo" (FnE 0 (IfE (FreeE "true") (numB 1) (numB 2)))
@@ -159,7 +185,7 @@ spec = do
 
     , Def "length" (FnE 1
                       (LetE
-                        (FnE 2 (AppE (FreeE "+") [numB 1.0, VarE 1]))
+                        (FnE 2 (AppE (FreeE "+") [numB 1.0, VarE 2]))
                         (AppE (FreeE "foldl") [VarE 1, numB 0.0, VarE 2])))
 
     , Def "reverse" (FnE 1

@@ -32,8 +32,11 @@ spec = do
     , Ident "int", LPar, Ident "x", BinOp "/", Ident "y", RPar
     , Semi
 
+    , Define, Ident "a", BinOp "=", Num 10, Semi
+    , Define, Ident "b", BinOp "=", Num 4, Semi
+
     , Ident "a", BinOp "div", Ident "b", Semi
-    , Ident "c", BinOp "mod", Ident "d", Semi
+    , Ident "a", BinOp "mod", Ident "b", Semi
     ]
 
   lexFile "test/monop_fn.geom" $
@@ -43,7 +46,8 @@ spec = do
     ]
 
   lexFile "test/neg.geom" $
-    [ BinOp "-", BinOp "-", Num 10.0, Semi
+    [ Define, Ident "x", BinOp "=", Num 1.0, Semi
+    , BinOp "-", BinOp "-", Num 10.0, Semi
     , Num 1.0, BinOp "+", BinOp "-"
     , LPar, Ident "x", BinOp "+", Num 1.0, RPar, Semi
     , Num 1.0, BinOp "+", BinOp "-", Ident "x", BinOp "+", Num 1.0, Semi
@@ -63,7 +67,32 @@ spec = do
     ]
 
   lexFile "test/list_comp.geom" $
-    [ Bra, Ident "x", VBar
+    [ Define, Ident "_mapa"
+    , LPar, Ident "f", Comma, Bra, Ket, Comma, Ident "acc", RPar
+    , BinOp "=", Ident "acc"
+    , VBar, Ident "_mapa"
+    , LPar, Ident "f", Comma, Ident "x", BinOp ":", Ident "xs", Comma, Ident "acc", RPar
+    , BinOp "=", Ident "f"
+    , LPar, Ident "x"
+    , Comma, Ident "_mapa", LPar, Ident "f", Comma, Ident "xs", Comma, Ident "acc", RPar, RPar, Semi
+
+    , Define, Ident "_range"
+    , LPar, Ident "a", Comma, Ident "b", RPar
+    , BinOp "=", If, Ident "a", BinOp ">", Ident "b"
+    , Then, Bra, Ket
+    , Else, Ident "a", BinOp ":", Ident "_range"
+    , LPar, Ident "a", BinOp "+", Num 1
+    , Comma, Ident "b", RPar, Semi
+
+    , Define, Ident "a", BinOp "=", Num 1, Semi
+    , Define, Ident "b", BinOp "=", Num 10, Semi
+
+    , Define, Ident "xs", BinOp "=", Bra, Bra, Str "foo", Comma, Str "bar", Ket, Ket, Semi
+    , Define, Ident "ys", BinOp "=", Bra, Str "qux", Comma, Str "quux", Ket, Semi
+
+    , Define, Ident "y", BinOp "=", Ident "numeric", LPar, Num 0, RPar, Semi
+
+    , Bra, Ident "x", VBar
     , Ident "x", Gen
     , Bra, Ident "a", Range, Ident "b", Ket, Ket
     , Semi
@@ -123,13 +152,13 @@ spec = do
 
     , Define
     , Ident "length", LPar, Ident "xs", RPar, BinOp "="
-    , Let, Ident "plus1", LPar, Anon, Comma, Ident "x", RPar, BinOp "="
+    , Let, Ident "plus1", LPar, Ident "x", Comma, Anon, RPar, BinOp "="
     , Num 1.0, BinOp "+", Ident "x", In
     , Ident "foldl", LPar, Ident "plus1", Comma, Num 0.0, Comma, Ident "xs", RPar, Semi
 
     , Define
     , Ident "reverse", LPar, Ident "xs", RPar, BinOp "="
-    , Let, Ident "snoc", LPar, Ident "x", Comma, Ident "y", RPar, BinOp "="
-    , Ident "y", BinOp ":", Ident "x", In
+    , Let, Ident "snoc", LPar, Ident "y", Comma, Ident "x", RPar, BinOp "="
+    , Ident "x", BinOp ":", Ident "y", In
     , Ident "foldl", LPar, Ident "snoc", Comma, Bra, Ket, Comma, Ident "xs", RPar, Semi
     ]
