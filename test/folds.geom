@@ -14,9 +14,9 @@ define filter(p, xs) =
   in foldr(test, [], xs);
 
 define length(xs) =
-  let plus1(_,x) = 1 + x
+  let plus1(x,_) = 1 + x
   in foldl(plus1, 0, xs);
 
 define reverse(xs) =
-  let snoc(x,y) = y:x
+  let snoc(y,x) = x:y
   in foldl(snoc, [], xs);

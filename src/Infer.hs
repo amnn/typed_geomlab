@@ -64,10 +64,13 @@ fresh isRef = do
     a = ord 'a'
     toId x
       | x < 26    = [chr (a + x)]
-      | otherwise = 't' : show x
+      | otherwise = 't' : show (x - 26)
 
 newTy :: Int -> TyB (StratV s) (TyRef s) -> ST s (TyRef s)
 newTy lvl t = newSTRef $ StratTy { ty = t, newLevel = Just (Lvl lvl), oldLevel = Lvl lvl }
+
+genTy :: TyB (StratV s) (TyRef s) -> ST s (TyRef s)
+genTy t = newSTRef $ StratTy { ty = t, newLevel = Just Gen, oldLevel = Gen }
 
 newVar :: ISRef s -> Int -> ST s (TyRef s)
 newVar isRef lvl = do
@@ -140,12 +143,10 @@ updateLevel isRef lvl tr = do
 
 unify :: ISRef s -> TyRef s -> TyRef s -> ST s ()
 unify isRef _tr _ur = do
-  t <- readSTRef _tr
-  u <- readSTRef _ur
-  if t == u
+  [_tr, _ur] <- mapM repr [_tr, _ur]
+  if _tr == _ur
   then return ()
   else do
-    [_tr, _ur] <- mapM repr [_tr, _ur]
     StratTy{ty = tyT, newLevel = lvlT} <- readSTRef _tr
     StratTy{ty = tyU, newLevel = lvlU} <- readSTRef _ur
     case (lvlT, lvlU) of
@@ -211,8 +212,9 @@ generalise isRef lvl tr = do
       StratTy{ty, newLevel = Just l} <- readSTRef _ur
       when (l > currLvl) $
         case ty of
-          VarTB (FreeV _) -> setLevel _ur Gen
-          _ -> do
+          VarTB (FreeV _)    -> setLevel _ur Gen
+          _ | length ty == 0 -> return ()
+            | otherwise -> do
             reps <- mapM repr ty
             mapM_ gen reps
             lvls <- mapM getLevel ty
@@ -252,7 +254,7 @@ typeOf gloDefs isRef = check
       | Just tr <- H.lookup v gloDefs = instantiate isRef lvl tr
       | otherwise                     = error ("unbound free variable: " ++ v)
 
-    check lvl (IfE c t e)             = do
+    check lvl (IfE c t e) = do
       [ctr, ttr, tte] <- mapM (check lvl) [c, t, e]
       btr <- newTy lvl BoolTB
       unify isRef ctr btr
@@ -325,16 +327,28 @@ resolveTyRef tr = do
     ArrTB as b      -> FixTy <$> (ArrTB <$> mapM resolveTyRef as <*> resolveTyRef b)
 
 abstractTy :: FixTy -> ST s (TyRef s)
-abstractTy (FixTy (VarTB n))    = newTy 0 $ VarTB (FreeV n)
-abstractTy (FixTy BoolTB)       = newTy 0 $ BoolTB
-abstractTy (FixTy NumTB)        = newTy 0 $ NumTB
-abstractTy (FixTy StrTB)        = newTy 0 $ StrTB
-abstractTy (FixTy AtomTB)       = newTy 0 $ AtomTB
-abstractTy (FixTy (ListTB t))   = abstractTy t >>= newTy 0 . ListTB
-abstractTy (FixTy (ArrTB as b)) = do
-  atrs <- mapM abstractTy as
-  bs   <- abstractTy b
-  newTy 0 (ArrTB atrs bs)
+abstractTy ft = do
+  sr <- newSTRef H.empty
+  absT sr ft
+  where
+    absT sr (FixTy (VarTB n)) = do
+      subst <- readSTRef sr
+      case H.lookup n subst of
+        Just vr -> return vr
+        Nothing -> do
+          vr <- genTy $ (VarTB (FreeV n))
+          modifySTRef sr (H.insert n vr)
+          return vr
+
+    absT _  (FixTy BoolTB)       = genTy $ BoolTB
+    absT _  (FixTy NumTB)        = genTy $ NumTB
+    absT _  (FixTy StrTB)        = genTy $ StrTB
+    absT _  (FixTy AtomTB)       = genTy $ AtomTB
+    absT sr (FixTy (ListTB t))   = absT sr t >>= genTy . ListTB
+    absT sr (FixTy (ArrTB as b)) = do
+      atrs <- mapM (absT sr) as
+      bs   <- absT sr b
+      genTy (ArrTB atrs bs)
 
 initialDefs :: ST s (H.Map Id (TyRef s))
 initialDefs = H.fromList <$> mapM absDef ts
@@ -343,6 +357,7 @@ initialDefs = H.fromList <$> mapM absDef ts
     ts = [ ("+", FixTy (ArrTB [FixTy NumTB, FixTy NumTB] (FixTy NumTB)))
          , ("-", FixTy (ArrTB [FixTy NumTB, FixTy NumTB] (FixTy NumTB)))
          , ("~", FixTy (ArrTB [FixTy NumTB] (FixTy NumTB)))
+         , (":", FixTy (ArrTB [FixTy (VarTB "a"), FixTy (ListTB (FixTy (VarTB "a")))] (FixTy (ListTB (FixTy (VarTB "a"))))))
          , ("true",  FixTy BoolTB)
          , ("false", FixTy BoolTB)
          ]
@@ -361,9 +376,9 @@ typeCheck ps = runST $ do
       return (gloDefs, eft:ts)
 
     tcPara isRef (gloDefs, ts) (Def x e) = do
-      evr <- newVar isRef 0
+      evr <- newVar isRef 1
       let gloDefs' = H.insert x evr gloDefs
-      etr <- typeOf gloDefs' isRef 0 e
+      etr <- typeOf gloDefs' isRef 1 e
       unify isRef evr etr
       cycleFree evr
       generalise isRef 0 evr
