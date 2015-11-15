@@ -1,13 +1,14 @@
 {-# LANGUAGE NamedFieldPuns, PatternGuards #-}
 module Infer where
 
-import Control.Monad (foldM, foldM_, replicateM, replicateM_, when)
+import Control.Monad (foldM, foldM_, replicateM, replicateM_, when, forM_)
 import Control.Monad.ST
 import Data.Char (chr, ord)
 import Data.Foldable (toList)
 import Data.Function (on)
 import qualified Data.HashMap as H
 import Data.STRef
+import Debug.Trace (traceM)
 import DynArray
 import Expr
 import Literal
@@ -79,6 +80,31 @@ newVar isRef lvl = do
 
 delayLevelUpdate :: ISRef s -> TyRef s -> ST s ()
 delayLevelUpdate isRef tr = modifySTRef isRef (delayTy tr)
+
+printTyRef :: TyRef s -> ST s ()
+printTyRef = p 0
+  where
+    p off tr = do
+      let spcs = replicate off ' '
+      let prn  = traceM . (spcs ++)
+      StratTy{ty, newLevel, oldLevel} <- readSTRef tr
+      prn $ concat ["{", show newLevel, ", ", show oldLevel, "}"]
+      case ty of
+        BoolTB -> prn "bool"
+        NumTB  -> prn "num"
+        StrTB  -> prn "str"
+        AtomTB -> prn "atom"
+
+        VarTB (FreeV n) -> prn $ "var: " ++ n
+        VarTB (FwdV f)  -> prn "var: ~~>" >> p (off + 2) f
+
+        ListTB t   -> prn "list: " >> p (off + 2) t
+        ArrTB as r -> do
+          prn "fn: "
+          forM_ as $ \a -> p (off + 2) a >> prn "---"
+          prn "-->"
+          p (off + 2) r
+          prn "***"
 
 -- | Resolves a type to its concrete representation. If the type is a variable
 -- and that variable is a forwarding pointer to some other type, follow the
