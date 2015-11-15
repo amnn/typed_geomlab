@@ -385,10 +385,17 @@ initialDefs = H.fromList <$> mapM absDef ts
     absDef (n, ty) = do { tr <- abstractTy ty; return (n, tr) }
     ts = [ ("+", FixTy (ArrTB [FixTy NumTB, FixTy NumTB] (FixTy NumTB)))
          , ("-", FixTy (ArrTB [FixTy NumTB, FixTy NumTB] (FixTy NumTB)))
+         , ("*", FixTy (ArrTB [FixTy NumTB, FixTy NumTB] (FixTy NumTB)))
+         , ("/", FixTy (ArrTB [FixTy NumTB, FixTy NumTB] (FixTy NumTB)))
          , ("~", FixTy (ArrTB [FixTy NumTB] (FixTy NumTB)))
+         , ("int", FixTy (ArrTB [FixTy NumTB] (FixTy NumTB)))
+         , ("numeric", FixTy (ArrTB [FixTy NumTB] (FixTy BoolTB)))
          , (":", FixTy (ArrTB [FixTy (VarTB "a"), FixTy (ListTB (FixTy (VarTB "a")))] (FixTy (ListTB (FixTy (VarTB "a"))))))
          , ("true",  FixTy BoolTB)
          , ("false", FixTy BoolTB)
+         , (">", FixTy (ArrTB [FixTy (VarTB "a"), FixTy (VarTB "a")] (FixTy BoolTB)))
+         , ("<", FixTy (ArrTB [FixTy (VarTB "a"), FixTy (VarTB "a")] (FixTy BoolTB)))
+         , ("=", FixTy (ArrTB [FixTy (VarTB "a"), FixTy (VarTB "a")] (FixTy BoolTB)))
          ]
 
 typeCheck :: [Para Expr] -> [FixTy]
