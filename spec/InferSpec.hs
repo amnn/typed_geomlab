@@ -76,3 +76,12 @@ spec = do
     , BoolT
     , BoolT
     ]
+
+  typeCheckFile "test/section.geom" $
+    [ ArrT [ArrT [VarT "a", VarT "b"] (VarT "c"), VarT "a"] (ArrT [VarT "b"] (VarT "c"))
+    , ArrT [ArrT [VarT "a", VarT "b"] (VarT "c"), VarT "b"] (ArrT [VarT "a"] (VarT "c"))
+    , ArrT [VarT "a"] (ListT (VarT "a"))
+    , ArrT [StrT] (ListT StrT)
+    , ArrT [ListT NumT] (ListT NumT)
+    , ArrT [ListT AtomT] (ListT AtomT)
+    ]

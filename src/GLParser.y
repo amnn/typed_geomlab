@@ -107,9 +107,9 @@ Term : Factor { $1 }
 
 TermOrSect ::             { Sugar }
 TermOrSect : Factor       { $1 }
-           | Factor BinOp { RSectS $1 $2 }
+           | Factor BinOp { LSectS $1 $2 }
            | OpTree       { mkOpExpr $1 }
-           | OpTree BinOp { RSectS (mkOpExpr $1) $2 }
+           | OpTree BinOp { LSectS (mkOpExpr $1) $2 }
 
 OpTree ::                    { OpTree Sugar }
 OpTree : Factor BinOp Factor { Op $2 (Leaf $1) (Leaf $3) }
@@ -139,7 +139,7 @@ Primary : num                       { numB $1 }
         | '[' ListExpr ']'          { $2 }
         | '(' monop ')'             { VarS $2 }
         | '(' BinOp ')'             { VarS $2 }
-        | '(' BinOpNoMinus Term ')' { LSectS $2 $3 }
+        | '(' BinOpNoMinus Term ')' { RSectS $2 $3 }
         | '(' ExprOrSect ')'        { $2 }
 
 Actuals ::                 { [Sugar] }

@@ -25,8 +25,8 @@ data Sugar = LitS (LitB Sugar)
            | IfS Sugar Sugar Sugar
            | FnS [FnArm]
            | AppS Id [Sugar]
-           | LSectS Id Sugar
-           | RSectS Sugar Id
+           | LSectS Sugar Id
+           | RSectS Id Sugar
            | LetS Id Sugar Sugar
            | SeqS Sugar Sugar
              deriving (Eq, Show)
@@ -39,8 +39,8 @@ data SugarB a = LitSB (LitB a)
               | IfSB a a a
               | FnSB [FnArmB a]
               | AppSB Id [a]
-              | LSectSB Id a
-              | RSectSB a Id
+              | LSectSB a Id
+              | RSectSB Id a
               | LetSB Id a a
               | SeqSB a a
                 deriving (Eq, Show, Functor)
