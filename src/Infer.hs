@@ -397,18 +397,22 @@ initialDefs = H.fromList <$> mapM absDef ts
 
 typeCheck :: [Para Expr] -> [Ty Id]
 typeCheck ps = runST $ do
-  tyCtx   <- newArray_ 4
-  isRef   <- newSTRef $ IS {tyCtx, waitingToAdjust = [], nextTyVar = 0}
   gloDefs <- initialDefs
-  reverse . snd <$> foldM (tcPara isRef) (gloDefs, []) ps
+  reverse . snd <$> foldM tcPara (gloDefs, []) ps
   where
-    tcPara isRef (gloDefs, ts) (Eval e)  = do
-      etr <- typeOf gloDefs isRef 0 e
+    newISRef = do
+      tyCtx <- newArray_ 4
+      newSTRef $ IS {tyCtx, waitingToAdjust = [], nextTyVar = 0}
+
+    tcPara (gloDefs, ts) (Eval e)  = do
+      isRef <- newISRef
+      etr   <- typeOf gloDefs isRef 0 e
       cycleFree etr
-      eft <- resolveTyRef etr
+      eft   <- resolveTyRef etr
       return (gloDefs, eft:ts)
 
-    tcPara isRef (gloDefs, ts) (Def x e) = do
+    tcPara (gloDefs, ts) (Def x e) = do
+      isRef <- newISRef
       evr <- newVar isRef 1
       let gloDefs' = H.insert x evr gloDefs
       etr <- typeOf gloDefs' isRef 1 e
