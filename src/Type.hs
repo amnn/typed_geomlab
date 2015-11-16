@@ -53,11 +53,9 @@ alphaEq t u = snd $ eq H.empty t u
       | Just x <- H.lookup v subst = (subst, x == w)
       | otherwise                  = (H.insert v w subst, True)
 
-    eq subst v w
-      | pv `shapeEq` pw =
-        let (subst', vs) = mapAccumL (uncurry . eq) subst $ (zip `on` toList) pv pw
-        in (subst', and vs)
-      | otherwise     = (subst, False)
-        where
-         pv = project v
-         pw = project w
+    eq subst v w | pv `shapeEq` pw = (subst', and vs)
+      where
+       (subst', vs) = mapAccumL (uncurry . eq) subst $ (zip `on` toList) pv pw
+       [pv, pw]     = project <$> [v, w]
+
+    eq subst _ _  = (subst, False)
