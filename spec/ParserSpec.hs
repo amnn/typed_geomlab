@@ -182,3 +182,26 @@ spec = do
               (LetS "g" (AppS "f" [VarS "f"])
                  (AppS "g" [atomB "foo"])))
     ]
+
+  parseFile "test/section.geom" $
+    [ Def "_lsect" (FnS [ FnArm "_lsect" [VarP "f", VarP "x"]
+                            (FnS [ FnArm "" [VarP "y"]
+                                     (AppS "f" [VarS "x", VarS "y"])
+                                     Nothing
+                                 ])
+                            Nothing
+                        ])
+
+    , Def "_rsect" (FnS [ FnArm "_rsect" [VarP "f", VarP "y"]
+                            (FnS [ FnArm "" [VarP "x"]
+                                     (AppS "f" [VarS "x", VarS "y"])
+                                     Nothing
+                                 ])
+                            Nothing
+                        ])
+
+    , Eval (RSectS ":" nilB)
+    , Eval (RSectS ":" (consB (strB "a") nilB))
+    , Eval (LSectS (numB 1) ":")
+    , Eval (LSectS (atomB "foo") ":")
+    ]

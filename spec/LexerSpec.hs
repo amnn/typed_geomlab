@@ -174,3 +174,16 @@ spec = do
     , Let, Ident "g", BinOp "=", Ident "f", LPar, Ident "f", RPar, In
     , Ident "g", LPar, Atom "foo", RPar, Semi
     ]
+
+  lexFile "test/section.geom" $
+    [ Define, Ident "_lsect", LPar, Ident "f", Comma, Ident "x", RPar, BinOp "="
+    , Function, LPar, Ident "y", RPar, Ident "f", LPar, Ident "x", Comma, Ident "y", RPar, Semi
+
+    , Define, Ident "_rsect", LPar, Ident "f", Comma, Ident "y", RPar, BinOp "="
+    , Function, LPar, Ident "x", RPar, Ident "f", LPar, Ident "x", Comma, Ident "y", RPar, Semi
+
+    , LPar, BinOp ":", Bra, Ket, RPar, Semi
+    , LPar, BinOp ":", Bra, Str "a", Ket, RPar, Semi
+    , LPar, Num 1, BinOp ":", RPar, Semi
+    , LPar, Atom "foo", BinOp ":", RPar, Semi
+    ]

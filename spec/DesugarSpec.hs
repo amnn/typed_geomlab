@@ -204,3 +204,13 @@ spec = do
               (LetE (AppE (VarE 2) [VarE 2])
                  (AppE (VarE 1) [atomB "foo"])))
     ]
+
+  desugarFile "test/section.geom" $
+    [ Def "_lsect" (FnE 2 (FnE 1 (AppE (VarE 3) [VarE 2, VarE 1])))
+    , Def "_rsect" (FnE 2 (FnE 1 (AppE (VarE 3) [VarE 1, VarE 2])))
+
+    , Eval (AppE (FreeE "_rsect") [FreeE ":", nilB])
+    , Eval (AppE (FreeE "_rsect") [FreeE ":", consB (strB "a") nilB])
+    , Eval (AppE (FreeE "_lsect") [FreeE ":", numB 1])
+    , Eval (AppE (FreeE "_lsect") [FreeE ":", atomB "foo"])
+    ]
