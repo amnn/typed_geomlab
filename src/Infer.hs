@@ -1,10 +1,17 @@
-{-# LANGUAGE ExistentialQuantification, NamedFieldPuns, PatternGuards, RankNTypes #-}
+{-# LANGUAGE ConstraintKinds
+           , ExistentialQuantification
+           , FlexibleContexts
+           , NamedFieldPuns
+           , PatternGuards
+           , RankNTypes #-}
+
 module Infer where
 
 import Control.Monad.Except
 import Control.Monad.Reader
 import Control.Monad.ST
-import Control.Monad.ST.Class (liftST)
+import Control.Monad.ST.Class
+import Control.Monad.State
 import Data.Char (chr, ord)
 import Data.Foldable (toList)
 import Data.Function (on)
@@ -40,25 +47,26 @@ data StratTy s = StratTy { ty       :: TyB (StratV s) (TyRef s)
                          , oldLevel :: !Level
                          } deriving Eq
 
-type TyError  = String
-type InferM s = ReaderT (ScopedState s) (ExceptT TyError (ST s))
+type TyError      = String
+type InferM s     = ReaderT (ScopedState s) (ExceptT TyError (ST s))
+type MonadInfer m = (MonadST m, MonadReader (ScopedState (World m)) m, MonadError TyError m)
 
-newIRef :: a -> InferM s (STRef s a)
+newIRef :: MonadInfer m => a -> m (STRef (World m) a)
 newIRef = liftST . newSTRef
 
-readIRef :: STRef s a -> InferM s a
+readIRef :: MonadInfer m => STRef (World m) a -> m a
 readIRef = liftST . readSTRef
 
-writeIRef :: STRef s a -> a -> InferM s ()
+writeIRef :: MonadInfer m => STRef (World m) a -> a -> m ()
 writeIRef sr x = liftST (writeSTRef sr x)
 
-modifyIRef :: STRef s a -> (a -> a) -> InferM s ()
+modifyIRef :: MonadInfer m => STRef (World m) a -> (a -> a) -> m ()
 modifyIRef sr f = liftST (modifySTRef sr f)
 
-getCurrLvl :: InferM s Int
+getCurrLvl :: MonadInfer m => m Int
 getCurrLvl = asks lvl
 
-getTyCtx :: InferM s (DynArray s (TyRef s))
+getTyCtx :: MonadInfer m => m (DynArray (World m) (TyRef (World m)))
 getTyCtx = tyCtx <$> (asks gsRef >>= readIRef)
 
 bumpVar :: GlobalState s -> GlobalState s
@@ -70,22 +78,22 @@ newScope st@SS{lvl = l} = st{lvl = l + 1}
 delayTy :: TyRef s -> GlobalState s -> GlobalState s
 delayTy tr is@GS {waitingToAdjust = wta} = is {waitingToAdjust = tr : wta}
 
-getLocalTy :: Int -> InferM s (TyRef s)
+getLocalTy :: MonadInfer m => Int -> m (TyRef (World m))
 getLocalTy ix = do
   GS {tyCtx} <- readIRef =<< asks gsRef
   liftST $ peek ix tyCtx
 
-pushLocal :: InferM s (TyRef s)
+pushLocal :: MonadInfer m => m (TyRef (World m))
 pushLocal = do
   tyCtx <- getTyCtx
   tr    <- newVar
   liftST $ push tyCtx tr
   return tr
 
-popLocal :: InferM s ()
+popLocal :: MonadInfer m => m ()
 popLocal = getTyCtx >>= liftST . pop
 
-fresh :: InferM s Id
+fresh :: MonadInfer m => m Id
 fresh = do
   SS {gsRef}     <- ask
   GS {nextTyVar} <- readIRef gsRef
@@ -97,23 +105,23 @@ fresh = do
       | x < 26    = [chr (a + x)]
       | otherwise = 't' : show (x - 26)
 
-newTy :: TyB (StratV s) (TyRef s) -> InferM s (TyRef s)
+newTy :: MonadInfer m => TyB (StratV (World m)) (TyRef (World m)) -> m (TyRef (World m))
 newTy t = do
   lvl <- getCurrLvl
   newIRef $ StratTy { ty = t, newLevel = Just (Lvl lvl), oldLevel = Lvl lvl }
 
-genTy :: TyB (StratV s) (TyRef s) -> InferM s (TyRef s)
+genTy :: MonadInfer m => TyB (StratV (World m)) (TyRef (World m)) -> m (TyRef (World m))
 genTy t = newIRef $ StratTy { ty = t, newLevel = Just Gen, oldLevel = Gen }
 
-newVar :: InferM s (TyRef s)
+newVar :: MonadInfer m => m (TyRef (World m))
 newVar = fresh >>= newTy . VarTB . FreeV
 
-delayLevelUpdate :: TyRef s -> InferM s ()
+delayLevelUpdate :: MonadInfer m => TyRef (World m) -> m ()
 delayLevelUpdate tr = do
   SS {gsRef} <- ask
   modifyIRef gsRef (delayTy tr)
 
-printTyRef :: TyRef s -> InferM s ()
+printTyRef :: MonadInfer m => TyRef (World m) -> m ()
 printTyRef = p 0
   where
     p off tr = do
@@ -141,7 +149,7 @@ printTyRef = p 0
 -- | Resolves a type to its concrete representation. If the type is a variable
 -- and that variable is a forwarding pointer to some other type, follow the
 -- pointers until a concrete type is reached, and compress the path followed.
-repr :: TyRef s -> InferM s (TyRef s)
+repr :: MonadInfer m => TyRef (World m) -> m (TyRef (World m))
 repr tr = do
   sty@StratTy{ty} <- readIRef tr
   case ty of
@@ -151,26 +159,26 @@ repr tr = do
       return _tr
     _ -> return tr
 
-markTy :: TyRef s -> InferM s Level
+markTy :: MonadInfer m => TyRef (World m) -> m Level
 markTy tr = do
   sty@StratTy{newLevel = Just lvl} <- readIRef tr
   writeIRef tr sty {newLevel = Nothing}
   return lvl
 
-setLevel :: TyRef s -> Level -> InferM s ()
+setLevel :: MonadInfer m => TyRef (World m) -> Level -> m ()
 setLevel tr lvl = do
   modifyIRef tr $ \st -> st{newLevel = Just lvl}
 
-getLevel :: TyRef s -> InferM s Level
+getLevel :: MonadInfer m => TyRef (World m) -> m Level
 getLevel tr = do
   StratTy{newLevel = Just lvl} <- readIRef tr
   return lvl
 
-unifyLevels :: TyRef s -> Level -> InferM s ()
+unifyLevels :: MonadInfer m => TyRef (World m) -> Level -> m ()
 unifyLevels tr lvl =
   modifyIRef tr $ \st -> st{newLevel = Just lvl, oldLevel = lvl}
 
-cycleFree :: TyRef s -> InferM s ()
+cycleFree :: MonadInfer m => TyRef (World m) -> m ()
 cycleFree tr = do
   StratTy{ty, newLevel} <- readIRef tr
   case ty of
@@ -180,7 +188,7 @@ cycleFree tr = do
             mapM_ cycleFree ty
             setLevel tr lvl
 
-updateLevel :: Level -> TyRef s -> InferM s ()
+updateLevel :: MonadInfer m => Level -> TyRef (World m) -> m ()
 updateLevel lvl tr = do
   StratTy{ty, newLevel, oldLevel} <- readIRef tr
   case ty of
@@ -202,7 +210,7 @@ updateLevel lvl tr = do
 
     _ -> error "cannot update level"
 
-unify :: TyRef s -> TyRef s -> InferM s ()
+unify :: MonadInfer m => TyRef (World m) -> TyRef (World m) -> m ()
 unify _tr _ur = do
   [_tr, _ur] <- mapM repr [_tr, _ur]
   if _tr == _ur
@@ -236,7 +244,7 @@ unify _tr _ur = do
       updateLevel l vp
       unify vp wr
 
-forceDelayedAdjustments :: InferM s ()
+forceDelayedAdjustments :: MonadInfer m => m ()
 forceDelayedAdjustments = do
   SS {gsRef}             <- ask
   gs@GS{waitingToAdjust} <- readIRef gsRef
@@ -264,7 +272,7 @@ forceDelayedAdjustments = do
           when (nLvl' > nLvl) (setLevel _tr nLvl)
           adjustTop ts _tr
 
-generalise :: TyRef s -> InferM s ()
+generalise :: MonadInfer m => TyRef (World m) -> m ()
 generalise tr = do
   forceDelayedAdjustments
   gen tr
@@ -284,27 +292,25 @@ generalise tr = do
             let maxLvl = maximum lvls
             unifyLevels _ur maxLvl
 
-instantiate :: TyRef s -> InferM s (TyRef s)
-instantiate tRef = do
-  substR <- newIRef H.empty
-  inst substR tRef
+instantiate :: MonadInfer m => TyRef (World m) -> m (TyRef (World m))
+instantiate tRef = evalStateT (inst tRef) H.empty
   where
-    inst substR tr = do
+    inst tr = do
       StratTy{ty, newLevel = Just lvl} <- readIRef tr
       case ty of
         VarTB (FreeV n) | Gen <- lvl -> do
-          subst <- readIRef substR
+          subst <- get
           case H.lookup n subst of
             Just ty' -> return ty'
             Nothing  -> do
               nr <- newVar
-              modifyIRef substR (H.insert n nr)
+              put (H.insert n nr subst)
               return nr
-        VarTB (FwdV link) -> inst substR link
-        _ | Gen <- lvl    -> mapM (inst substR) ty >>= newTy
+        VarTB (FwdV link) -> inst link
+        _ | Gen <- lvl    -> mapM inst ty >>= newTy
         _                 -> return tr
 
-typeOf :: H.Map Id (TyRef s) -> Expr -> InferM s (TyRef s)
+typeOf :: MonadInfer m => H.Map Id (TyRef (World m)) -> Expr -> m (TyRef (World m))
 typeOf gloDefs = check
   where
     check (LitE l)  = checkLit check l
@@ -373,7 +379,7 @@ typeOf gloDefs = check
       unify ltr ttr
       return ltr
 
-resolveTyRef :: TyRef s -> InferM s (Ty Id)
+resolveTyRef :: MonadInfer m => TyRef (World m) -> m (Ty Id)
 resolveTyRef tr = do
   StratTy{ty} <- readIRef =<< repr tr
   case ty of
@@ -387,7 +393,7 @@ resolveTyRef tr = do
     ListTB t        -> ListT <$> resolveTyRef t
     ArrTB as b      -> ArrT <$> mapM resolveTyRef as <*> resolveTyRef b
 
-abstractTy :: (Ty Id) -> InferM s (TyRef s)
+abstractTy :: MonadInfer m => Ty Id -> m (TyRef (World m))
 abstractTy ty = do
   sr <- newIRef H.empty
   absT sr ty
