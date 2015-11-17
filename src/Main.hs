@@ -30,8 +30,9 @@ desugar = runAndFormat (mapM_ print) desugarM
     applyDesugar = map (fmap desugarExpr)
 
 tc :: String -> IO ()
-tc = runAndFormat (mapM_ print) tcM
+tc = runAndFormat fmt tcM
   where
+    fmt = either (putStrLn . ("Type Error: "++)) (mapM_ print)
     tcM = typeCheck . map (fmap desugarExpr) <$> parseExpr
 
 processFile :: String -> IO ()

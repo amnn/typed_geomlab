@@ -183,7 +183,7 @@ cycleFree tr = do
   StratTy{ty, newLevel} <- readIRef tr
   case ty of
     VarTB (FwdV t) -> cycleFree t
-    _ | Nothing <- newLevel -> error "cycle: occurs check"
+    _ | Nothing <- newLevel -> throwError "cycle: occurs check"
     _ -> do lvl <- markTy tr
             mapM_ cycleFree ty
             setLevel tr lvl
@@ -200,7 +200,7 @@ updateLevel lvl tr = do
       , length ty == 0 ->
         when (lvl < lvl') $ setLevel tr lvl
 
-    _ | Nothing           <- newLevel -> error "cycle: occurs check"
+    _ | Nothing           <- newLevel -> throwError "cycle: occurs check"
     _ | Just lvl'@(Lvl _) <- newLevel -> do
         when (lvl < lvl') $ do
           when (lvl' == oldLevel) $ do
@@ -208,7 +208,7 @@ updateLevel lvl tr = do
           setLevel tr lvl
         return ()
 
-    _ -> error "cannot update level"
+    _ -> throwError "cannot update level"
 
 unify :: MonadInfer m => TyRef (World m) -> TyRef (World m) -> m ()
 unify _tr _ur = do
@@ -231,8 +231,8 @@ unify _tr _ur = do
             mapM_ markTy [_tr, _ur]
             unifySub minLvl tyT tyU
             mapM_ (flip setLevel minLvl) [_tr, _ur]
-          _ -> error "unification error"
-      _ -> error "cycle: occurs check"
+          _ -> throwError "unification error"
+      _ -> throwError "cycle: occurs check"
   where
     link vr wr = do
       modifyIRef wr $ \st -> st{ty = VarTB (FwdV vr)}
@@ -267,7 +267,7 @@ forceDelayedAdjustments = do
       _tr <- repr _tr
       StratTy{newLevel = mNLvl'} <- readIRef _tr
       case mNLvl' of
-        Nothing    -> error "cycle: occurs check"
+        Nothing    -> throwError "cycle: occurs check"
         Just nLvl' -> do
           when (nLvl' > nLvl) (setLevel _tr nLvl)
           adjustTop ts _tr
@@ -318,7 +318,7 @@ typeOf gloDefs = check
 
     check (FreeE v)
       | Just tr <- H.lookup v gloDefs = instantiate tr
-      | otherwise                     = error ("unbound free variable: " ++ v)
+      | otherwise                     = throwError ("unbound free variable: " ++ v)
 
     check (IfE c t e) = do
       [ctr, ttr, tte] <- mapM check [c, t, e]
@@ -384,7 +384,7 @@ resolveTyRef tr = do
   StratTy{ty} <- readIRef =<< repr tr
   case ty of
     VarTB (FreeV n) -> return $ VarT n
-    VarTB (FwdV  _) -> error "resolveTyRef: forward pointer!"
+    VarTB (FwdV  _) -> throwError "resolveTyRef: forward pointer!"
 
     BoolTB          -> return $ BoolT
     NumTB           -> return $ NumT
