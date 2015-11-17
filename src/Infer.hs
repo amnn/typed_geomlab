@@ -208,7 +208,7 @@ updateLevel lvl tr = do
           setLevel tr lvl
         return ()
 
-    _ -> throwError "cannot update level"
+    _ -> error "updateLevel: cannot update level"
 
 unify :: MonadInfer m => TyRef (World m) -> TyRef (World m) -> m ()
 unify _tr _ur = do
@@ -384,7 +384,7 @@ resolveTyRef tr = do
   StratTy{ty} <- readIRef =<< repr tr
   case ty of
     VarTB (FreeV n) -> return $ VarT n
-    VarTB (FwdV  _) -> throwError "resolveTyRef: forward pointer!"
+    VarTB (FwdV  _) -> error "resolveTyRef: forward pointer!"
 
     BoolTB          -> return $ BoolT
     NumTB           -> return $ NumT
