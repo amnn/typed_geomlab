@@ -1,5 +1,4 @@
 {-# LANGUAGE ConstraintKinds
-           , ExistentialQuantification
            , FlexibleContexts
            , NamedFieldPuns
            , PatternGuards
@@ -47,7 +46,11 @@ data StratTy s = StratTy { ty       :: TyB (StratV s) (TyRef s)
                          , oldLevel :: !Level
                          } deriving Eq
 
-type TyError      = String
+data TyError = UnboundVarE Id
+             | UnificationE
+             | OccursE
+               deriving (Eq, Show)
+
 type InferM s     = ReaderT (ScopedState s) (ExceptT TyError (ST s))
 type MonadInfer m = (MonadST m, MonadReader (ScopedState (World m)) m, MonadError TyError m)
 
@@ -183,7 +186,7 @@ cycleFree tr = do
   StratTy{ty, newLevel} <- readIRef tr
   case ty of
     VarTB (FwdV t) -> cycleFree t
-    _ | Nothing <- newLevel -> throwError "cycle: occurs check"
+    _ | Nothing <- newLevel -> throwError OccursE
     _ -> do lvl <- markTy tr
             mapM_ cycleFree ty
             setLevel tr lvl
@@ -200,7 +203,7 @@ updateLevel lvl tr = do
       , length ty == 0 ->
         when (lvl < lvl') $ setLevel tr lvl
 
-    _ | Nothing           <- newLevel -> throwError "cycle: occurs check"
+    _ | Nothing           <- newLevel -> throwError OccursE
     _ | Just lvl'@(Lvl _) <- newLevel -> do
         when (lvl < lvl') $ do
           when (lvl' == oldLevel) $ do
@@ -231,8 +234,8 @@ unify _tr _ur = do
             mapM_ markTy [_tr, _ur]
             unifySub minLvl tyT tyU
             mapM_ (flip setLevel minLvl) [_tr, _ur]
-          _ -> throwError "unification error"
-      _ -> throwError "cycle: occurs check"
+          _ -> throwError UnificationE
+      _ -> throwError OccursE
   where
     link vr wr = do
       modifyIRef wr $ \st -> st{ty = VarTB (FwdV vr)}
@@ -267,7 +270,7 @@ forceDelayedAdjustments = do
       _tr <- repr _tr
       StratTy{newLevel = mNLvl'} <- readIRef _tr
       case mNLvl' of
-        Nothing    -> throwError "cycle: occurs check"
+        Nothing    -> throwError OccursE
         Just nLvl' -> do
           when (nLvl' > nLvl) (setLevel _tr nLvl)
           adjustTop ts _tr
@@ -318,7 +321,7 @@ typeOf gloDefs = check
 
     check (FreeE v)
       | Just tr <- H.lookup v gloDefs = instantiate tr
-      | otherwise                     = throwError ("unbound free variable: " ++ v)
+      | otherwise                     = throwError $ UnboundVarE v
 
     check (IfE c t e) = do
       [ctr, ttr, tte] <- mapM check [c, t, e]
