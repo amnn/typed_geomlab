@@ -1,8 +1,10 @@
-{-# LANGUAGE NamedFieldPuns, PatternGuards #-}
+{-# LANGUAGE ExistentialQuantification, NamedFieldPuns, PatternGuards, RankNTypes #-}
 module Infer where
 
-import Control.Monad (foldM, foldM_, replicateM, replicateM_, when, forM_)
+import Control.Monad.Except
+import Control.Monad.Reader
 import Control.Monad.ST
+import Control.Monad.ST.Class (liftST)
 import Data.Char (chr, ord)
 import Data.Foldable (toList)
 import Data.Function (on)
@@ -18,12 +20,17 @@ import Sugar
 import Token (Id)
 import Type
 
-type ISRef s = STRef s (InferState s)
+type GSRef s = STRef s (GlobalState s)
 type TyRef s = STRef s (StratTy s)
-data InferState s = IS { tyCtx           :: DynArray s (TyRef s)
-                       , waitingToAdjust :: [TyRef s]
-                       , nextTyVar       :: !Int
-                       }
+
+data GlobalState s = GS { tyCtx           :: DynArray s (TyRef s)
+                        , waitingToAdjust :: [TyRef s]
+                        , nextTyVar       :: !Int
+                        }
+
+data ScopedState s = SS { gsRef :: GSRef s
+                        , lvl   :: !Int
+                        }
 
 data Level = Lvl Int | Gen deriving (Eq, Show, Ord)
 
@@ -33,33 +40,56 @@ data StratTy s = StratTy { ty       :: TyB (StratV s) (TyRef s)
                          , oldLevel :: !Level
                          } deriving Eq
 
-bumpVar :: InferState s -> InferState s
-bumpVar is@IS {nextTyVar = n} = is {nextTyVar = n + 1}
+type TyError  = String
+type InferM s = ReaderT (ScopedState s) (ExceptT TyError (ST s))
 
-delayTy :: TyRef s -> InferState s -> InferState s
-delayTy tr is@IS {waitingToAdjust = wta} = is {waitingToAdjust = tr : wta}
+newIRef :: a -> InferM s (STRef s a)
+newIRef = liftST . newSTRef
 
-getLocalTy :: ISRef s -> Int -> ST s (TyRef s)
-getLocalTy isRef ix = do
-  IS {tyCtx} <- readSTRef isRef
-  peek ix tyCtx
+readIRef :: STRef s a -> InferM s a
+readIRef = liftST . readSTRef
 
-pushLocal :: ISRef s -> Int -> ST s (TyRef s)
-pushLocal isRef lvl = do
-  IS {tyCtx} <- readSTRef isRef
-  tr <- newVar isRef lvl
-  push tyCtx tr
+writeIRef :: STRef s a -> a -> InferM s ()
+writeIRef sr x = liftST (writeSTRef sr x)
+
+modifyIRef :: STRef s a -> (a -> a) -> InferM s ()
+modifyIRef sr f = liftST (modifySTRef sr f)
+
+getCurrLvl :: InferM s Int
+getCurrLvl = asks lvl
+
+getTyCtx :: InferM s (DynArray s (TyRef s))
+getTyCtx = tyCtx <$> (asks gsRef >>= readIRef)
+
+bumpVar :: GlobalState s -> GlobalState s
+bumpVar is@GS {nextTyVar = n} = is {nextTyVar = n + 1}
+
+newScope :: ScopedState s -> ScopedState s
+newScope st@SS{lvl = l} = st{lvl = l + 1}
+
+delayTy :: TyRef s -> GlobalState s -> GlobalState s
+delayTy tr is@GS {waitingToAdjust = wta} = is {waitingToAdjust = tr : wta}
+
+getLocalTy :: Int -> InferM s (TyRef s)
+getLocalTy ix = do
+  GS {tyCtx} <- readIRef =<< asks gsRef
+  liftST $ peek ix tyCtx
+
+pushLocal :: InferM s (TyRef s)
+pushLocal = do
+  tyCtx <- getTyCtx
+  tr    <- newVar
+  liftST $ push tyCtx tr
   return tr
 
-popLocal :: ISRef s -> ST s ()
-popLocal isRef = do
-  IS {tyCtx} <- readSTRef isRef
-  pop tyCtx
+popLocal :: InferM s ()
+popLocal = getTyCtx >>= liftST . pop
 
-fresh :: ISRef s -> ST s Id
-fresh isRef = do
-  IS {nextTyVar} <- readSTRef isRef
-  modifySTRef isRef bumpVar
+fresh :: InferM s Id
+fresh = do
+  SS {gsRef}     <- ask
+  GS {nextTyVar} <- readIRef gsRef
+  modifyIRef gsRef bumpVar
   return (toId nextTyVar)
   where
     a = ord 'a'
@@ -67,27 +97,29 @@ fresh isRef = do
       | x < 26    = [chr (a + x)]
       | otherwise = 't' : show (x - 26)
 
-newTy :: Int -> TyB (StratV s) (TyRef s) -> ST s (TyRef s)
-newTy lvl t = newSTRef $ StratTy { ty = t, newLevel = Just (Lvl lvl), oldLevel = Lvl lvl }
+newTy :: TyB (StratV s) (TyRef s) -> InferM s (TyRef s)
+newTy t = do
+  lvl <- getCurrLvl
+  newIRef $ StratTy { ty = t, newLevel = Just (Lvl lvl), oldLevel = Lvl lvl }
 
-genTy :: TyB (StratV s) (TyRef s) -> ST s (TyRef s)
-genTy t = newSTRef $ StratTy { ty = t, newLevel = Just Gen, oldLevel = Gen }
+genTy :: TyB (StratV s) (TyRef s) -> InferM s (TyRef s)
+genTy t = newIRef $ StratTy { ty = t, newLevel = Just Gen, oldLevel = Gen }
 
-newVar :: ISRef s -> Int -> ST s (TyRef s)
-newVar isRef lvl = do
-  v <- fresh isRef
-  newTy lvl (VarTB (FreeV v))
+newVar :: InferM s (TyRef s)
+newVar = fresh >>= newTy . VarTB . FreeV
 
-delayLevelUpdate :: ISRef s -> TyRef s -> ST s ()
-delayLevelUpdate isRef tr = modifySTRef isRef (delayTy tr)
+delayLevelUpdate :: TyRef s -> InferM s ()
+delayLevelUpdate tr = do
+  SS {gsRef} <- ask
+  modifyIRef gsRef (delayTy tr)
 
-printTyRef :: TyRef s -> ST s ()
+printTyRef :: TyRef s -> InferM s ()
 printTyRef = p 0
   where
     p off tr = do
       let spcs = replicate off ' '
       let prn  = traceM . (spcs ++)
-      StratTy{ty, newLevel, oldLevel} <- readSTRef tr
+      StratTy{ty, newLevel, oldLevel} <- readIRef tr
       prn $ concat ["{", show newLevel, ", ", show oldLevel, "}"]
       case ty of
         BoolTB -> prn "bool"
@@ -109,38 +141,38 @@ printTyRef = p 0
 -- | Resolves a type to its concrete representation. If the type is a variable
 -- and that variable is a forwarding pointer to some other type, follow the
 -- pointers until a concrete type is reached, and compress the path followed.
-repr :: TyRef s -> ST s (TyRef s)
+repr :: TyRef s -> InferM s (TyRef s)
 repr tr = do
-  sty@StratTy{ty} <- readSTRef tr
+  sty@StratTy{ty} <- readIRef tr
   case ty of
     VarTB (FwdV _tr) -> do
       _tr <- repr _tr
-      writeSTRef tr $ sty {ty = (VarTB (FwdV _tr))}
+      writeIRef tr $ sty {ty = (VarTB (FwdV _tr))}
       return _tr
     _ -> return tr
 
-markTy :: TyRef s -> ST s Level
+markTy :: TyRef s -> InferM s Level
 markTy tr = do
-  sty@StratTy{newLevel = Just lvl} <- readSTRef tr
-  writeSTRef tr sty {newLevel = Nothing}
+  sty@StratTy{newLevel = Just lvl} <- readIRef tr
+  writeIRef tr sty {newLevel = Nothing}
   return lvl
 
-setLevel :: TyRef s -> Level -> ST s ()
+setLevel :: TyRef s -> Level -> InferM s ()
 setLevel tr lvl = do
-  modifySTRef tr $ \st -> st{newLevel = Just lvl}
+  modifyIRef tr $ \st -> st{newLevel = Just lvl}
 
-getLevel :: TyRef s -> ST s Level
+getLevel :: TyRef s -> InferM s Level
 getLevel tr = do
-  StratTy{newLevel = Just lvl} <- readSTRef tr
+  StratTy{newLevel = Just lvl} <- readIRef tr
   return lvl
 
-unifyLevels :: TyRef s -> Level -> ST s ()
+unifyLevels :: TyRef s -> Level -> InferM s ()
 unifyLevels tr lvl =
-  modifySTRef tr $ \st -> st{newLevel = Just lvl, oldLevel = lvl}
+  modifyIRef tr $ \st -> st{newLevel = Just lvl, oldLevel = lvl}
 
-cycleFree :: TyRef s -> ST s ()
+cycleFree :: TyRef s -> InferM s ()
 cycleFree tr = do
-  StratTy{ty, newLevel} <- readSTRef tr
+  StratTy{ty, newLevel} <- readIRef tr
   case ty of
     VarTB (FwdV t) -> cycleFree t
     _ | Nothing <- newLevel -> error "cycle: occurs check"
@@ -148,9 +180,9 @@ cycleFree tr = do
             mapM_ cycleFree ty
             setLevel tr lvl
 
-updateLevel :: ISRef s -> Level -> TyRef s -> ST s ()
-updateLevel isRef lvl tr = do
-  StratTy{ty, newLevel, oldLevel} <- readSTRef tr
+updateLevel :: Level -> TyRef s -> InferM s ()
+updateLevel lvl tr = do
+  StratTy{ty, newLevel, oldLevel} <- readIRef tr
   case ty of
     VarTB (FreeV _)
       | Just lvl'@(Lvl _) <- newLevel ->
@@ -164,28 +196,28 @@ updateLevel isRef lvl tr = do
     _ | Just lvl'@(Lvl _) <- newLevel -> do
         when (lvl < lvl') $ do
           when (lvl' == oldLevel) $ do
-            delayLevelUpdate isRef tr
+            delayLevelUpdate tr
           setLevel tr lvl
         return ()
 
     _ -> error "cannot update level"
 
-unify :: ISRef s -> TyRef s -> TyRef s -> ST s ()
-unify isRef _tr _ur = do
+unify :: TyRef s -> TyRef s -> InferM s ()
+unify _tr _ur = do
   [_tr, _ur] <- mapM repr [_tr, _ur]
   if _tr == _ur
   then return ()
   else do
-    StratTy{ty = tyT, newLevel = lvlT} <- readSTRef _tr
-    StratTy{ty = tyU, newLevel = lvlU} <- readSTRef _ur
+    StratTy{ty = tyT, newLevel = lvlT} <- readIRef _tr
+    StratTy{ty = tyU, newLevel = lvlU} <- readIRef _ur
     case (lvlT, lvlU) of
       (Just lt, Just lu) ->
         case (tyT, tyU) of
           (VarTB _, VarTB _)
             | lt > lu           -> link _tr _ur
             | otherwise         -> link _ur _tr
-          (VarTB _, _)          -> updateLevel isRef lt _ur >> link _ur _tr
-          (_, VarTB _)          -> updateLevel isRef lu _tr >> link _tr _ur
+          (VarTB _, _)          -> updateLevel lt _ur >> link _ur _tr
+          (_, VarTB _)          -> updateLevel lu _tr >> link _tr _ur
           _ | tyT `shapeEq` tyU -> do
             let minLvl = lt `min` lu
             mapM_ markTy [_tr, _ur]
@@ -195,23 +227,25 @@ unify isRef _tr _ur = do
       _ -> error "cycle: occurs check"
   where
     link vr wr = do
-      modifySTRef wr $ \st -> st{ty = VarTB (FwdV vr)}
+      modifyIRef wr $ \st -> st{ty = VarTB (FwdV vr)}
 
     unifySub l u v = sequence_ $ (zipWith (unifyLev l) `on` toList) u v
 
     unifyLev l vr wr = do
       vp <- repr vr
-      updateLevel isRef l vp
-      unify isRef vp wr
+      updateLevel l vp
+      unify vp wr
 
-forceDelayedAdjustments :: ISRef s -> Level -> ST s ()
-forceDelayedAdjustments isRef lvl = do
-  is@IS{waitingToAdjust} <- readSTRef isRef
-  delayed <- foldM adjustTop [] waitingToAdjust
-  writeSTRef isRef is{waitingToAdjust = delayed}
+forceDelayedAdjustments :: InferM s ()
+forceDelayedAdjustments = do
+  SS {gsRef}             <- ask
+  gs@GS{waitingToAdjust} <- readIRef gsRef
+  delayed                <- foldM adjustTop [] waitingToAdjust
+  writeIRef gsRef gs{waitingToAdjust = delayed}
   where
     adjustTop ts tr = do
-      StratTy{ty, newLevel = Just nLvl, oldLevel = oLvl} <- readSTRef tr
+      lvl <- Lvl <$> asks lvl
+      StratTy{ty, newLevel = Just nLvl, oldLevel = oLvl} <- readIRef tr
       case ty of
         _ | oLvl <= lvl  -> return (tr:ts)
         _ | oLvl == nLvl -> return ts
@@ -223,23 +257,23 @@ forceDelayedAdjustments isRef lvl = do
 
     adjustRec nLvl ts _tr = do
       _tr <- repr _tr
-      StratTy{newLevel = mNLvl'} <- readSTRef _tr
+      StratTy{newLevel = mNLvl'} <- readIRef _tr
       case mNLvl' of
         Nothing    -> error "cycle: occurs check"
         Just nLvl' -> do
           when (nLvl' > nLvl) (setLevel _tr nLvl)
           adjustTop ts _tr
 
-generalise :: ISRef s -> Int -> TyRef s -> ST s ()
-generalise isRef lvl tr = do
-  forceDelayedAdjustments isRef currLvl
+generalise :: TyRef s -> InferM s ()
+generalise tr = do
+  forceDelayedAdjustments
   gen tr
   where
-    currLvl = Lvl lvl
     gen _ur = do
       _ur <- repr _ur
-      StratTy{ty, newLevel = Just l} <- readSTRef _ur
-      when (l > currLvl) $
+      lvl <- Lvl <$> asks lvl
+      StratTy{ty, newLevel = Just l} <- readIRef _ur
+      when (l > lvl) $
         case ty of
           VarTB (FreeV _)    -> setLevel _ur Gen
           _ | length ty == 0 -> return ()
@@ -250,100 +284,98 @@ generalise isRef lvl tr = do
             let maxLvl = maximum lvls
             unifyLevels _ur maxLvl
 
-instantiate :: ISRef s -> Int -> TyRef s -> ST s (TyRef s)
-instantiate isRef currLvl tRef = do
-  substR <- newSTRef H.empty
+instantiate :: TyRef s -> InferM s (TyRef s)
+instantiate tRef = do
+  substR <- newIRef H.empty
   inst substR tRef
   where
     inst substR tr = do
-      StratTy{ty, newLevel = Just lvl} <- readSTRef tr
+      StratTy{ty, newLevel = Just lvl} <- readIRef tr
       case ty of
         VarTB (FreeV n) | Gen <- lvl -> do
-          subst <- readSTRef substR
+          subst <- readIRef substR
           case H.lookup n subst of
             Just ty' -> return ty'
             Nothing  -> do
-              nr <- newVar isRef currLvl
-              modifySTRef substR (H.insert n nr)
+              nr <- newVar
+              modifyIRef substR (H.insert n nr)
               return nr
         VarTB (FwdV link) -> inst substR link
-        _ | Gen <- lvl -> do
-          ty' <- mapM (inst substR) ty
-          newTy currLvl ty'
-        _ -> return tr
+        _ | Gen <- lvl    -> mapM (inst substR) ty >>= newTy
+        _                 -> return tr
 
-
-typeOf :: H.Map Id (TyRef s) -> ISRef s -> Int -> Expr -> ST s (TyRef s)
-typeOf gloDefs isRef = check
+typeOf :: H.Map Id (TyRef s) -> Expr -> InferM s (TyRef s)
+typeOf gloDefs = check
   where
-    check lvl (LitE l)  = checkLit (check lvl) lvl l
-    check lvl (VarE ix) = getLocalTy isRef ix >>= instantiate isRef lvl
+    check (LitE l)  = checkLit check l
+    check (VarE ix) = getLocalTy ix >>= instantiate
 
-    check lvl (FreeE v)
-      | Just tr <- H.lookup v gloDefs = instantiate isRef lvl tr
+    check (FreeE v)
+      | Just tr <- H.lookup v gloDefs = instantiate tr
       | otherwise                     = error ("unbound free variable: " ++ v)
 
-    check lvl (IfE c t e) = do
-      [ctr, ttr, tte] <- mapM (check lvl) [c, t, e]
-      btr <- newTy lvl BoolTB
-      unify isRef ctr btr
-      unify isRef ttr tte
+    check (IfE c t e) = do
+      [ctr, ttr, tte] <- mapM check [c, t, e]
+      btr <- newTy BoolTB
+      unify ctr btr
+      unify ttr tte
       return ttr
 
-    check lvl (CaseE e as) = do
-      etr        <- check lvl e
-      (atr:atrs) <- mapM (checkArm lvl etr) as
-      foldM_ (const $ unify isRef atr) () atrs
+    check (CaseE e as) = do
+      etr        <- check e
+      (atr:atrs) <- mapM (checkArm etr) as
+      foldM_ (const $ unify atr) () atrs
       return atr
 
-    check lvl (FnE a e) = do
-      ptrs <- replicateM a (pushLocal isRef lvl)
-      etr  <- check lvl e
-      replicateM_ a (popLocal isRef)
-      newTy lvl (ArrTB ptrs etr)
+    check (FnE a e) = do
+      ptrs <- replicateM a pushLocal
+      etr  <- check e
+      replicateM_ a popLocal
+      newTy (ArrTB ptrs etr)
 
-    check lvl (AppE f as) = do
-      ftr  <- check lvl f
-      atrs <- mapM (check lvl) as
-      rtr  <- newVar isRef lvl
-      ftr' <- newTy lvl (ArrTB atrs rtr)
-      unify isRef ftr ftr'
+    check (AppE f as) = do
+      ftr  <- check f
+      atrs <- mapM check as
+      rtr  <- newVar
+      unify ftr =<< newTy (ArrTB atrs rtr)
       return rtr
 
-    check lvl (LetE a b) = do
-      ltr <- pushLocal isRef (lvl+1)
-      check (lvl+1) a >>= unify isRef ltr
-      generalise isRef lvl ltr
-      btr <- check lvl b
-      popLocal isRef
+    check (LetE a b) = do
+      atr <- local newScope $ do
+        ltr <- pushLocal
+        check a >>= unify ltr
+        return ltr
+      generalise atr
+      btr <- check b
+      popLocal
       return btr
 
-    check lvl (SeqE a b) = check lvl a >> check lvl b
+    check (SeqE a b) = check a >> check b
 
-    check lvl _ = newVar isRef lvl
+    check _ = newVar
 
-    checkArm lvl etr (p, a) = do
-      patTy lvl p >>= unify isRef etr
-      atr <- check lvl a
-      replicateM_ (holes p) (popLocal isRef)
+    checkArm etr (p, a) = do
+      patTy p >>= unify etr
+      atr <- check a
+      replicateM_ (holes p) popLocal
       return atr
 
-    patTy lvl (ValPB l) = checkLit (const $ pushLocal isRef lvl) lvl l
-    patTy lvl (VarPB _) = pushLocal isRef lvl
+    patTy (ValPB l) = checkLit (const pushLocal) l
+    patTy (VarPB _) = pushLocal
 
-    checkLit _ lvl (NumB _)    = newTy lvl NumTB
-    checkLit _ lvl (StrB _)    = newTy lvl StrTB
-    checkLit _ lvl (AtomB _)   = newTy lvl AtomTB
-    checkLit _ lvl NilB        = newVar isRef lvl >>= newTy lvl . ListTB
-    checkLit f lvl (ConsB h t) = do
+    checkLit _ (NumB _)    = newTy NumTB
+    checkLit _ (StrB _)    = newTy StrTB
+    checkLit _ (AtomB _)   = newTy AtomTB
+    checkLit _ NilB        = newVar >>= newTy . ListTB
+    checkLit f (ConsB h t) = do
       [htr, ttr] <- mapM f [h, t]
-      ltr <- newTy lvl (ListTB htr)
-      unify isRef ltr ttr
+      ltr <- newTy (ListTB htr)
+      unify ltr ttr
       return ltr
 
-resolveTyRef :: TyRef s -> ST s (Ty Id)
+resolveTyRef :: TyRef s -> InferM s (Ty Id)
 resolveTyRef tr = do
-  StratTy{ty} <- readSTRef =<< repr tr
+  StratTy{ty} <- readIRef =<< repr tr
   case ty of
     VarTB (FreeV n) -> return $ VarT n
     VarTB (FwdV  _) -> error "resolveTyRef: forward pointer!"
@@ -355,18 +387,18 @@ resolveTyRef tr = do
     ListTB t        -> ListT <$> resolveTyRef t
     ArrTB as b      -> ArrT <$> mapM resolveTyRef as <*> resolveTyRef b
 
-abstractTy :: (Ty Id) -> ST s (TyRef s)
+abstractTy :: (Ty Id) -> InferM s (TyRef s)
 abstractTy ty = do
-  sr <- newSTRef H.empty
+  sr <- newIRef H.empty
   absT sr ty
   where
     absT sr (VarT n) = do
-      subst <- readSTRef sr
+      subst <- readIRef sr
       case H.lookup n subst of
         Just vr -> return vr
         Nothing -> do
           vr <- genTy $ (VarTB (FreeV n))
-          modifySTRef sr (H.insert n vr)
+          modifyIRef sr (H.insert n vr)
           return vr
 
     absT _  BoolT       = genTy $ BoolTB
@@ -379,7 +411,7 @@ abstractTy ty = do
       bs   <- absT sr b
       genTy (ArrTB atrs bs)
 
-initialDefs :: ST s (H.Map Id (TyRef s))
+initialDefs :: InferM s (H.Map Id (TyRef s))
 initialDefs = H.fromList <$> mapM absDef ts
   where
     absDef (n, ty) = do { tr <- abstractTy ty; return (n, tr) }
@@ -395,29 +427,32 @@ initialDefs = H.fromList <$> mapM absDef ts
          , ("false",   BoolT)
          ]
 
-typeCheck :: [Para Expr] -> [Ty Id]
-typeCheck ps = runST $ do
-  gloDefs <- initialDefs
-  reverse . snd <$> foldM tcPara (gloDefs, []) ps
+typeCheck :: [Para Expr] -> Either TyError [Ty Id]
+typeCheck ps = runST (runExceptT (runReaderT topLevel undefined))
   where
-    newISRef = do
-      tyCtx <- newArray_ 4
-      newSTRef $ IS {tyCtx, waitingToAdjust = [], nextTyVar = 0}
+    topLevel = do
+      gloDefs <- initialDefs
+      reverse . snd <$> foldM tcPara (gloDefs, []) ps
 
-    tcPara (gloDefs, ts) (Eval e)  = do
-      isRef <- newISRef
-      etr   <- typeOf gloDefs isRef 0 e
+    topScope im = do
+      tyCtx <- liftST $ newArray_ 4
+      gsRef <- newIRef $ GS {tyCtx, waitingToAdjust = [], nextTyVar = 0}
+      local (const $ SS {gsRef, lvl = 0}) im
+
+    tcPara (gloDefs, ts) (Eval e)  = topScope $ do
+      etr <- typeOf gloDefs e
       cycleFree etr
       eft   <- resolveTyRef etr
       return (gloDefs, eft:ts)
 
-    tcPara (gloDefs, ts) (Def x e) = do
-      isRef <- newISRef
-      evr <- newVar isRef 1
-      let gloDefs' = H.insert x evr gloDefs
-      etr <- typeOf gloDefs' isRef 1 e
-      unify isRef evr etr
-      cycleFree evr
-      generalise isRef 0 evr
-      eft <- resolveTyRef evr
+    tcPara (gloDefs, ts) (Def x e) = topScope $ do
+      (gloDefs', dtr) <- local newScope $ do
+        evr <- newVar
+        let gloDefs' = H.insert x evr gloDefs
+        etr <- typeOf gloDefs' e
+        unify evr etr
+        cycleFree evr
+        return (gloDefs', evr)
+      generalise dtr
+      eft <- resolveTyRef dtr
       return (gloDefs', eft:ts)
