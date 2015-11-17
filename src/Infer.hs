@@ -26,8 +26,9 @@ import Sugar
 import Token (Id)
 import Type
 
-type GSRef s = STRef s (GlobalState s)
-type TyRef s = STRef s (StratTy s)
+type GSRef  s = STRef s (GlobalState s)
+type TyRef  s = STRef s (StratTy s)
+type GloDef s = H.Map Id (TyRef s)
 
 data GlobalState s = GS { tyCtx           :: DynArray s (TyRef s)
                         , waitingToAdjust :: [TyRef s]
@@ -54,16 +55,16 @@ data TyError = UnboundVarE Id
 type InferM s     = ReaderT (ScopedState s) (ExceptT TyError (ST s))
 type MonadInfer m = (MonadST m, MonadReader (ScopedState (World m)) m, MonadError TyError m)
 
-newIRef :: MonadInfer m => a -> m (STRef (World m) a)
+newIRef :: MonadST m => a -> m (STRef (World m) a)
 newIRef = liftST . newSTRef
 
-readIRef :: MonadInfer m => STRef (World m) a -> m a
+readIRef :: MonadST m => STRef (World m) a -> m a
 readIRef = liftST . readSTRef
 
-writeIRef :: MonadInfer m => STRef (World m) a -> a -> m ()
+writeIRef :: MonadST m => STRef (World m) a -> a -> m ()
 writeIRef sr x = liftST (writeSTRef sr x)
 
-modifyIRef :: MonadInfer m => STRef (World m) a -> (a -> a) -> m ()
+modifyIRef :: MonadST m => STRef (World m) a -> (a -> a) -> m ()
 modifyIRef sr f = liftST (modifySTRef sr f)
 
 getCurrLvl :: MonadInfer m => m Int
@@ -113,7 +114,7 @@ newTy t = do
   lvl <- getCurrLvl
   newIRef $ StratTy { ty = t, newLevel = Just (Lvl lvl), oldLevel = Lvl lvl }
 
-genTy :: MonadInfer m => TyB (StratV (World m)) (TyRef (World m)) -> m (TyRef (World m))
+genTy :: MonadST m => TyB (StratV (World m)) (TyRef (World m)) -> m (TyRef (World m))
 genTy t = newIRef $ StratTy { ty = t, newLevel = Just Gen, oldLevel = Gen }
 
 newVar :: MonadInfer m => m (TyRef (World m))
@@ -313,7 +314,7 @@ instantiate tRef = evalStateT (inst tRef) H.empty
         _ | Gen <- lvl    -> mapM inst ty >>= newTy
         _                 -> return tr
 
-typeOf :: MonadInfer m => H.Map Id (TyRef (World m)) -> Expr -> m (TyRef (World m))
+typeOf :: MonadInfer m => GloDef (World m) -> Expr -> m (TyRef (World m))
 typeOf gloDefs = check
   where
     check (LitE l)  = checkLit check l
@@ -396,7 +397,7 @@ resolveTyRef tr = do
     ListTB t        -> ListT <$> resolveTyRef t
     ArrTB as b      -> ArrT <$> mapM resolveTyRef as <*> resolveTyRef b
 
-abstractTy :: MonadInfer m => Ty Id -> m (TyRef (World m))
+abstractTy :: MonadST m => Ty Id -> m (TyRef (World m))
 abstractTy ty = evalStateT (absT ty) H.empty
   where
     absT (VarT n) = do
@@ -418,7 +419,7 @@ abstractTy ty = evalStateT (absT ty) H.empty
       btr  <- absT b
       genTy (ArrTB atrs btr)
 
-initialDefs :: InferM s (H.Map Id (TyRef s))
+initialDefs :: MonadST m => m (GloDef (World m))
 initialDefs = H.fromList <$> mapM absDef ts
   where
     absDef (n, ty) = do { tr <- abstractTy ty; return (n, tr) }
@@ -439,27 +440,33 @@ typeCheck ps = runST (runExceptT (runReaderT topLevel undefined))
   where
     topLevel = do
       gloDefs <- initialDefs
-      reverse . snd <$> foldM tcPara (gloDefs, []) ps
+      evalStateT (reverse <$> foldM tcPara [] ps) gloDefs
 
     topScope im = do
       tyCtx <- liftST $ newArray_ 4
       gsRef <- newIRef $ GS {tyCtx, waitingToAdjust = [], nextTyVar = 0}
       local (const $ SS {gsRef, lvl = 0}) im
 
-    tcPara (gloDefs, ts) (Eval e)  = topScope $ do
-      etr <- typeOf gloDefs e
-      cycleFree etr
-      eft   <- resolveTyRef etr
-      return (gloDefs, eft:ts)
+    tcPara :: [Ty Id]
+           -> Para Expr
+           -> StateT (GloDef s) (InferM s) [Ty Id]
 
-    tcPara (gloDefs, ts) (Def x e) = topScope $ do
-      (gloDefs', dtr) <- local newScope $ do
-        evr <- newVar
-        let gloDefs' = H.insert x evr gloDefs
-        etr <- typeOf gloDefs' e
+    tcPara ts (Eval e) = topScope $ do
+      gloDefs <- get
+      etr     <- typeOf gloDefs e
+      cycleFree etr
+      eft     <- resolveTyRef etr
+      return (eft:ts)
+
+    tcPara ts (Def x e) = topScope $ do
+      dtr <- local newScope $ do
+        evr      <- newVar
+        gloDefs' <- H.insert x evr <$> get
+        put gloDefs'
+        etr      <- typeOf gloDefs' e
         unify evr etr
         cycleFree evr
-        return (gloDefs', evr)
+        return evr
       generalise dtr
       eft <- resolveTyRef dtr
-      return (gloDefs', eft:ts)
+      return (eft:ts)
