@@ -394,28 +394,26 @@ resolveTyRef tr = do
     ArrTB as b      -> ArrT <$> mapM resolveTyRef as <*> resolveTyRef b
 
 abstractTy :: MonadInfer m => Ty Id -> m (TyRef (World m))
-abstractTy ty = do
-  sr <- newIRef H.empty
-  absT sr ty
+abstractTy ty = evalStateT (absT ty) H.empty
   where
-    absT sr (VarT n) = do
-      subst <- readIRef sr
+    absT (VarT n) = do
+      subst <- get
       case H.lookup n subst of
         Just vr -> return vr
         Nothing -> do
-          vr <- genTy $ (VarTB (FreeV n))
-          modifyIRef sr (H.insert n vr)
+          vr <- genTy . VarTB . FreeV $ n
+          put (H.insert n vr subst)
           return vr
 
-    absT _  BoolT       = genTy $ BoolTB
-    absT _  NumT        = genTy $ NumTB
-    absT _  StrT        = genTy $ StrTB
-    absT _  AtomT       = genTy $ AtomTB
-    absT sr (ListT t)   = absT sr t >>= genTy . ListTB
-    absT sr (ArrT as b) = do
-      atrs <- mapM (absT sr) as
-      bs   <- absT sr b
-      genTy (ArrTB atrs bs)
+    absT BoolT       = genTy $ BoolTB
+    absT NumT        = genTy $ NumTB
+    absT StrT        = genTy $ StrTB
+    absT AtomT       = genTy $ AtomTB
+    absT (ListT t)   = absT t >>= genTy . ListTB
+    absT (ArrT as b) = do
+      atrs <- mapM absT as
+      btr  <- absT b
+      genTy (ArrTB atrs btr)
 
 initialDefs :: InferM s (H.Map Id (TyRef s))
 initialDefs = H.fromList <$> mapM absDef ts
