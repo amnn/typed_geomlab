@@ -72,15 +72,6 @@ getCurrLvl = asks lvl
 getTyCtx :: MonadInfer m => m (DynArray (World m) (TyRef (World m)))
 getTyCtx = tyCtx <$> (asks gsRef >>= readIRef)
 
-bumpVar :: GlobalState s -> GlobalState s
-bumpVar is@GS {nextTyVar = n} = is {nextTyVar = n + 1}
-
-newScope :: ScopedState s -> ScopedState s
-newScope st@SS{lvl = l} = st{lvl = l + 1}
-
-delayTy :: TyRef s -> GlobalState s -> GlobalState s
-delayTy tr is@GS {waitingToAdjust = wta} = is {waitingToAdjust = tr : wta}
-
 getLocalTy :: MonadInfer m => Int -> m (TyRef (World m))
 getLocalTy ix = do
   GS {tyCtx} <- readIRef =<< asks gsRef
@@ -96,6 +87,10 @@ pushLocal = do
 popLocal :: MonadInfer m => m ()
 popLocal = getTyCtx >>= liftST . pop
 
+newScope :: MonadInfer m => m a -> m a
+newScope = local bumpScope
+  where bumpScope st@SS {lvl = l} = st{lvl = l + 1}
+
 fresh :: MonadInfer m => m Id
 fresh = do
   SS {gsRef}     <- ask
@@ -103,6 +98,8 @@ fresh = do
   modifyIRef gsRef bumpVar
   return (toId nextTyVar)
   where
+    bumpVar is@GS {nextTyVar = n} = is {nextTyVar = n + 1}
+
     a = ord 'a'
     toId x
       | x < 26    = [chr (a + x)]
@@ -123,6 +120,8 @@ delayLevelUpdate :: MonadInfer m => TyRef (World m) -> m ()
 delayLevelUpdate tr = do
   SS {gsRef} <- ask
   modifyIRef gsRef (delayTy tr)
+  where
+    delayTy t is@GS {waitingToAdjust = wta} = is {waitingToAdjust = t : wta}
 
 printTyRef :: MonadInfer m => TyRef (World m) -> m ()
 printTyRef = p 0
@@ -350,7 +349,7 @@ typeOf gloDefs = check
       return rtr
 
     check (LetE a b) = do
-      atr <- local newScope $ do
+      atr <- newScope $ do
         ltr <- pushLocal
         check a >>= unify ltr
         return ltr
@@ -451,7 +450,7 @@ typeCheck ps = runST $ evalStateT (mapM tcPara ps) =<< initialDefs
       resolveTyRef etr
 
     tcPara (Def x e) = topScope $ do
-      dtr <- local newScope $ do
+      dtr <- newScope $ do
         evr <- newVar
         modify (H.insert x evr)
         etr <- flip typeOf e =<< get
