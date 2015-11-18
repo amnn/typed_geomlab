@@ -30,29 +30,55 @@ type GSRef  s = STRef s (GlobalState s)
 type TyRef  s = STRef s (StratTy s)
 type GloDef s = H.Map Id (TyRef s)
 
+-- | This state is held in a reference that is available from anywhere in the
+-- type checker. It holds the list of currently bound variables, a list of type
+-- references whose levels need to be fully adjusted, and a counter used to
+-- spawn new type variables.
 data GlobalState s = GS { tyCtx           :: DynArray s (TyRef s)
                         , waitingToAdjust :: [TyRef s]
                         , nextTyVar       :: !Int
                         }
 
+-- | Read-only environment state. Holds the reference to the global state (which
+-- never changes) and the current level, which increases as we move through more
+-- @ let @ expressions.
 data ScopedState s = SS { gsRef :: GSRef s
                         , lvl   :: !Int
                         }
 
+-- | A representation of the level of a type, with a notion of ordering. @ Gen @
+-- represents the "generalised" level, which is considered higher than all other
+-- levels.
 data Level = Lvl Int | Gen deriving (Eq, Show, Ord)
 
+-- | Representation of variables. Each can either be a name, or a link to
+-- another type reference.
 data StratV  s = FreeV Id | FwdV (TyRef s) deriving Eq
+
+-- | Representation of types, annotated by their level.
 data StratTy s = StratTy { ty       :: TyB (StratV s) (TyRef s)
                          , newLevel :: Maybe Level
                          , oldLevel :: !Level
                          } deriving Eq
 
+-- | Possible Type Errors that the checker may emit
 data TyError = UnboundVarE Id
+            -- ^ A free variable was found for which no type exists
+            -- (i.e. undefined variable).
              | UnificationE
+            -- ^ Could not unify two types.
              | OccursE
+            -- ^ When unifying a variable with a type, we found the variable
+            -- within the type (A cycle was detected in the occurs check).
                deriving (Eq, Show)
 
-type MonadInfer m = (MonadST m, MonadReader (ScopedState (World m)) m, MonadError TyError m)
+-- | Constraint of all the Monads used by the type checker.
+type MonadInfer m = ( MonadST m
+                    , MonadReader (ScopedState (World m)) m
+                    , MonadError TyError m
+                    )
+
+-- The usual STRef operations, lifted to any monad that supports ST operations.
 
 newIRef :: MonadST m => a -> m (STRef (World m) a)
 newIRef = liftST . newSTRef
@@ -66,17 +92,20 @@ writeIRef sr x = liftST (writeSTRef sr x)
 modifyIRef :: MonadST m => STRef (World m) a -> (a -> a) -> m ()
 modifyIRef sr f = liftST (modifySTRef sr f)
 
+-- | Query the environment for the current level.
 getCurrLvl :: MonadInfer m => m Int
 getCurrLvl = asks lvl
 
+-- | Query the global state for the list of local variables.
 getTyCtx :: MonadInfer m => m (DynArray (World m) (TyRef (World m)))
 getTyCtx = tyCtx <$> (asks gsRef >>= readIRef)
 
+-- | Query the environment for the type of a particular local variable,
+-- identified by its deBruijn index.
 getLocalTy :: MonadInfer m => Int -> m (TyRef (World m))
-getLocalTy ix = do
-  GS {tyCtx} <- readIRef =<< asks gsRef
-  liftST $ peek ix tyCtx
+getLocalTy ix = getTyCtx >>= liftST . peek ix
 
+-- | Introduce a new local variable to the stack, and return a reference to it.
 pushLocal :: MonadInfer m => m (TyRef (World m))
 pushLocal = do
   tyCtx <- getTyCtx
@@ -84,13 +113,16 @@ pushLocal = do
   liftST $ push tyCtx tr
   return tr
 
+-- | Remove the top-most local variable from the stack.
 popLocal :: MonadInfer m => m ()
 popLocal = getTyCtx >>= liftST . pop
 
+-- | Run the supplied monad in a scope nested one level below the current one.
 newScope :: MonadInfer m => m a -> m a
 newScope = local bumpScope
   where bumpScope st@SS {lvl = l} = st{lvl = l + 1}
 
+-- | Produce a unique variable name.
 fresh :: MonadInfer m => m Id
 fresh = do
   SS {gsRef}     <- ask
@@ -105,17 +137,28 @@ fresh = do
       | x < 26    = [chr (a + x)]
       | otherwise = 't' : show (x - 26)
 
-newTy :: MonadInfer m => TyB (StratV (World m)) (TyRef (World m)) -> m (TyRef (World m))
+-- | Create a new type at the current level, from the structure provided.
+newTy :: MonadInfer m
+      => TyB (StratV (World m)) (TyRef (World m))
+      -- ^ The structure of the type
+      -> m (TyRef (World m))
+      -- ^ A reference to a type with the given structure, created at the
+      -- current level.
+
 newTy t = do
   lvl <- getCurrLvl
   newIRef $ StratTy { ty = t, newLevel = Just (Lvl lvl), oldLevel = Lvl lvl }
 
+-- | Create a new type at the generic level, from the structure provided.
 genTy :: MonadST m => TyB (StratV (World m)) (TyRef (World m)) -> m (TyRef (World m))
 genTy t = newIRef $ StratTy { ty = t, newLevel = Just Gen, oldLevel = Gen }
 
+-- | Create a fresh type variable at the current level.
 newVar :: MonadInfer m => m (TyRef (World m))
 newVar = fresh >>= newTy . VarTB . FreeV
 
+-- | Add a type reference to the global list of references waiting to have their
+-- levels adjusted.
 delayLevelUpdate :: MonadInfer m => TyRef (World m) -> m ()
 delayLevelUpdate tr = do
   SS {gsRef} <- ask
@@ -123,6 +166,8 @@ delayLevelUpdate tr = do
   where
     delayTy t is@GS {waitingToAdjust = wta} = is {waitingToAdjust = t : wta}
 
+-- | Debug method to print the structure of a type as represented by type
+-- references. This function may diverge if given a cyclic type structure.
 printTyRef :: MonadInfer m => TyRef (World m) -> m ()
 printTyRef = p 0
   where
@@ -161,25 +206,36 @@ repr tr = do
       return _tr
     _ -> return tr
 
+-- | Mark a reference as having been visited. Doing so overwrites its level
+-- value, so that is returned so that it may be restored later. If a marked
+-- reference is visited more than once, this indicates a cycle has been
+-- detected.
 markTy :: MonadInfer m => TyRef (World m) -> m Level
 markTy tr = do
   sty@StratTy{newLevel = Just lvl} <- readIRef tr
   writeIRef tr sty {newLevel = Nothing}
   return lvl
 
+-- | Set the level of a type reference.
 setLevel :: MonadInfer m => TyRef (World m) -> Level -> m ()
 setLevel tr lvl = do
   modifyIRef tr $ \st -> st{newLevel = Just lvl}
 
+-- | Get the level of a type reference.
 getLevel :: MonadInfer m => TyRef (World m) -> m Level
 getLevel tr = do
   StratTy{newLevel = Just lvl} <- readIRef tr
   return lvl
 
+-- | Set all level values of a type as the same. When this is done to non-leaf
+-- types, it indicates that all child levels have been properly adjusted and
+-- accounted for.
 unifyLevels :: MonadInfer m => TyRef (World m) -> Level -> m ()
 unifyLevels tr lvl =
   modifyIRef tr $ \st -> st{newLevel = Just lvl, oldLevel = lvl}
 
+-- | Check whether a type is free of all cycles. This function is only used at
+-- the top-level.
 cycleFree :: MonadInfer m => TyRef (World m) -> m ()
 cycleFree tr = do
   StratTy{ty, newLevel} <- readIRef tr
@@ -190,6 +246,11 @@ cycleFree tr = do
             mapM_ cycleFree ty
             setLevel tr lvl
 
+-- | Update the level of a type reference, or register the reference to have its
+-- level updated eventually. Level changes are made in response to unification:
+-- If a type is unified with a variable at a lower level (higher scope), then
+-- its level must be duly updated to indicate that it is accessible from that
+-- higher scope, and so should not be generalised at the lower scope.
 updateLevel :: MonadInfer m => Level -> TyRef (World m) -> m ()
 updateLevel lvl tr = do
   StratTy{ty, newLevel, oldLevel} <- readIRef tr
@@ -212,6 +273,8 @@ updateLevel lvl tr = do
 
     _ -> error "updateLevel: cannot update level"
 
+-- | Massage two type references until they are both the 'same' (not counting
+-- forwarding pointers).
 unify :: MonadInfer m => TyRef (World m) -> TyRef (World m) -> m ()
 unify _tr _ur = do
   [_tr, _ur] <- mapM repr [_tr, _ur]
@@ -246,6 +309,10 @@ unify _tr _ur = do
       updateLevel l vp
       unify vp wr
 
+-- | Find all type references from lower scopes than the current one, and ensure
+-- that level adjustments have all been made for them. This is done before a
+-- generalisation, as a level adjustment could result in a type not being
+-- generalised.
 forceDelayedAdjustments :: MonadInfer m => m ()
 forceDelayedAdjustments = do
   SS {gsRef}             <- ask
@@ -274,6 +341,8 @@ forceDelayedAdjustments = do
           when (nLvl' > nLvl) (setLevel _tr nLvl)
           adjustTop ts _tr
 
+-- | Generalisation involves universally quantifying variables that are scoped
+-- strictly below the current level.
 generalise :: MonadInfer m => TyRef (World m) -> m ()
 generalise tr = do
   forceDelayedAdjustments
@@ -294,6 +363,9 @@ generalise tr = do
             let maxLvl = maximum lvls
             unifyLevels _ur maxLvl
 
+-- | Replace universally quantified variables in a (possibly) general type with
+-- fresh type variables at the current level: Every instance of a generalised
+-- type is new, and unification with one instance should not affect another.
 instantiate :: MonadInfer m => TyRef (World m) -> m (TyRef (World m))
 instantiate tRef = evalStateT (inst tRef) H.empty
   where
@@ -312,6 +384,8 @@ instantiate tRef = evalStateT (inst tRef) H.empty
         _ | Gen <- lvl    -> mapM inst ty >>= newTy
         _                 -> return tr
 
+-- | Calculate the type of a given expression, given a map from free variables
+-- to type references. Alternatively, an error may be thrown.
 typeOf :: MonadInfer m => GloDef (World m) -> Expr -> m (TyRef (World m))
 typeOf gloDefs = check
   where
@@ -381,6 +455,7 @@ typeOf gloDefs = check
       unify ltr ttr
       return ltr
 
+-- | Convert a type reference into a type tree by chasing forwarding pointers.
 resolveTyRef :: MonadInfer m => TyRef (World m) -> m (Ty Id)
 resolveTyRef tr = do
   StratTy{ty} <- readIRef =<< repr tr
@@ -395,6 +470,7 @@ resolveTyRef tr = do
     ListTB t        -> ListT <$> resolveTyRef t
     ArrTB as b      -> ArrT <$> mapM resolveTyRef as <*> resolveTyRef b
 
+-- | Create a type reference at the "general" level, from a type tree.
 abstractTy :: MonadST m => Ty Id -> m (TyRef (World m))
 abstractTy ty = evalStateT (absT ty) H.empty
   where
@@ -417,6 +493,7 @@ abstractTy ty = evalStateT (absT ty) H.empty
       btr  <- absT b
       genTy (ArrTB atrs btr)
 
+-- | Types of operations and values that are already provided by the language.
 initialDefs :: MonadST m => m (GloDef (World m))
 initialDefs = H.fromList <$> mapM absDef ts
   where
@@ -427,14 +504,22 @@ initialDefs = H.fromList <$> mapM absDef ts
     ts = (numBOp <$> ["+", "-", "*", "/"])
       ++ (numMOp <$> ["~", "int"])
       ++ (relBOp <$> ["<", "<=", "<>", "=", ">=", ">"])
-      ++ [ ("numeric", ArrT [NumT] BoolT)
+      ++ [ ("numeric", ArrT [VarT "a"] BoolT)
          , (":",       ArrT [VarT "a", ListT (VarT "a")] (ListT (VarT "a")))
          , ("true",    BoolT)
          , ("false",   BoolT)
          ]
 
-type InferM s = ReaderT (ScopedState s) (ExceptT TyError (StateT (GloDef s) (ST s)))
+-- | Concrete Monad Transformer Stack satisfying the @ MonadInfer @
+-- constraint. @ StateT (GloDef s) @ is introduced so as to keep track of the
+-- global definition map without storing a reference to it.
+type InferM s = ReaderT (ScopedState s)
+              ( ExceptT TyError
+              ( StateT (GloDef s)
+              ( ST s)))
 
+-- | Given a list of top-level statements, type check each one individually and
+-- give the type or error for each top-level operation.
 typeCheck :: [Para Expr] -> [Either TyError (Ty Id)]
 typeCheck ps = runST $ evalStateT (mapM tcPara ps) =<< initialDefs
   where
