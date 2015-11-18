@@ -52,7 +52,6 @@ data TyError = UnboundVarE Id
              | OccursE
                deriving (Eq, Show)
 
-type InferM s     = ReaderT (ScopedState s) (ExceptT TyError (ST s))
 type MonadInfer m = (MonadST m, MonadReader (ScopedState (World m)) m, MonadError TyError m)
 
 newIRef :: MonadST m => a -> m (STRef (World m) a)
@@ -435,38 +434,29 @@ initialDefs = H.fromList <$> mapM absDef ts
          , ("false",   BoolT)
          ]
 
-typeCheck :: [Para Expr] -> Either TyError [Ty Id]
-typeCheck ps = runST (runExceptT (runReaderT topLevel undefined))
-  where
-    topLevel = do
-      gloDefs <- initialDefs
-      evalStateT (reverse <$> foldM tcPara [] ps) gloDefs
+type InferM s = ReaderT (ScopedState s) (ExceptT TyError (StateT (GloDef s) (ST s)))
 
-    topScope im = do
+typeCheck :: [Para Expr] -> [Either TyError (Ty Id)]
+typeCheck ps = runST $ evalStateT (mapM tcPara ps) =<< initialDefs
+  where
+    topScope im = runExceptT . flip runReaderT undefined $ do
       tyCtx <- liftST $ newArray_ 4
       gsRef <- newIRef $ GS {tyCtx, waitingToAdjust = [], nextTyVar = 0}
       local (const $ SS {gsRef, lvl = 0}) im
 
-    tcPara :: [Ty Id]
-           -> Para Expr
-           -> StateT (GloDef s) (InferM s) [Ty Id]
-
-    tcPara ts (Eval e) = topScope $ do
+    tcPara (Eval e) = topScope $ do
       gloDefs <- get
       etr     <- typeOf gloDefs e
       cycleFree etr
-      eft     <- resolveTyRef etr
-      return (eft:ts)
+      resolveTyRef etr
 
-    tcPara ts (Def x e) = topScope $ do
+    tcPara (Def x e) = topScope $ do
       dtr <- local newScope $ do
-        evr      <- newVar
-        gloDefs' <- H.insert x evr <$> get
-        put gloDefs'
-        etr      <- typeOf gloDefs' e
+        evr <- newVar
+        modify (H.insert x evr)
+        etr <- flip typeOf e =<< get
         unify evr etr
         cycleFree evr
         return evr
       generalise dtr
-      eft <- resolveTyRef dtr
-      return (eft:ts)
+      resolveTyRef dtr

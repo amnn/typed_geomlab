@@ -6,7 +6,7 @@ import Type
 spec :: Spec
 spec = do
   typeCheckFile "test/compose.geom" $
-    Right
+    map Right
       [ ArrT [ ArrT [VarT "b"] (VarT "c")
              , ArrT [VarT "a"] (VarT "b")
              ]
@@ -17,7 +17,7 @@ spec = do
       ]
 
   typeCheckFile "test/divmod.geom" $
-    Right
+    map Right
       [ ArrT [NumT, NumT] NumT
       , ArrT [NumT, NumT] NumT
 
@@ -29,12 +29,12 @@ spec = do
       ]
 
   typeCheckFile "test/empty.geom" $
-    Right
+    map Right
       [ ArrT [] NumT
       ]
 
   typeCheckFile "test/folds.geom" $
-    Right
+    map Right
       [ ArrT [ArrT [VarT "a", VarT "b"] (VarT "b"), VarT "b", ListT (VarT "a")] (VarT "b")
       , ArrT [ArrT [VarT "b", VarT "a"] (VarT "b"), VarT "b", ListT (VarT "a")] (VarT "b")
       , ArrT [ArrT [VarT "a"] (VarT "b"), ListT (VarT "a")] (ListT (VarT "b"))
@@ -44,14 +44,14 @@ spec = do
       ]
 
   typeCheckFile "test/let_gen.geom" $
-    Right
+    map Right
       [ ArrT [VarT "a"] (VarT "a")
       , NumT
       , AtomT
       ]
 
   typeCheckFile "test/list_comp.geom" $
-    Right
+    map Right
       [ ArrT [ArrT [VarT "a", VarT "b"] (VarT "b"), ListT (VarT "a"), VarT "b"] (VarT "b")
       , ArrT [NumT, NumT] (ListT NumT)
 
@@ -69,23 +69,23 @@ spec = do
       ]
 
   typeCheckFile "test/monop_fn.geom" $
-    Right [NumT, NumT, NumT]
+    map Right [NumT, NumT, NumT]
 
   typeCheckFile "test/neg.geom" $
-    Right [NumT, NumT, NumT, NumT]
+    map Right [NumT, NumT, NumT, NumT]
 
   typeCheckFile "test/nest.geom" $
-    Right [NumT]
+    map Right [NumT]
 
   typeCheckFile "test/not.geom" $
-    Right
+    map Right
       [ ArrT [BoolT] BoolT
       , BoolT
       , BoolT
       ]
 
   typeCheckFile "test/section.geom" $
-    Right
+    map Right
       [ ArrT [ArrT [VarT "a", VarT "b"] (VarT "c"), VarT "a"] (ArrT [VarT "b"] (VarT "c"))
       , ArrT [ArrT [VarT "a", VarT "b"] (VarT "c"), VarT "b"] (ArrT [VarT "a"] (VarT "c"))
       , ArrT [VarT "a"] (ListT (VarT "a"))
