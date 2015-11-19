@@ -516,7 +516,7 @@ initialDefs = H.fromList <$> mapM absDef ts
     relBOp i = (i, ArrT [VarT "a", VarT "a"] BoolT)
     ts = (numBOp <$> ["+", "-", "*", "/"])
       ++ (numMOp <$> ["~", "int"])
-      ++ (relBOp <$> ["<", "<=", "<>", "=", ">=", ">"])
+      ++ (relBOp <$> ["<", "<=", "<>", "=", ">=", ">", "and", "or"])
       ++ [ ("numeric", ArrT [VarT "a"] BoolT)
          , (":",       ArrT [VarT "a", ListT (VarT "a")] (ListT (VarT "a")))
          , ("true",    BoolT)
