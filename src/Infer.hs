@@ -174,6 +174,7 @@ printTyRef = p 0
     p off tr = do
       let spcs = replicate off ' '
       let prn  = traceM . (spcs ++)
+      let indent = p (off + 2)
       StratTy{ty, newLevel, oldLevel} <- readIRef tr
       prn $ concat ["{", show newLevel, ", ", show oldLevel, "}"]
       case ty of
@@ -185,13 +186,14 @@ printTyRef = p 0
         VarTB (FreeV n) -> prn $ "var: " ++ n
         VarTB (FwdV f)  -> prn "var: ~~>" >> p (off + 2) f
 
-        RefTB  t   -> prn "ref: " >> p (off + 2) t
-        ListTB t   -> prn "list: " >> p (off + 2) t
+        RefTB  t   -> prn "ref: "  >> indent t
+        ListTB t   -> prn "list: " >> indent t
+        HashTB k v -> prn "hash: " >> indent k >> prn "==>" >> indent v
         ArrTB as r -> do
           prn "fn: "
-          forM_ as $ \a -> p (off + 2) a >> prn "---"
+          forM_ as $ \a -> indent a >> prn "---"
           prn "-->"
-          p (off + 2) r
+          indent r
           prn "***"
 
 -- | Resolves a type to its concrete representation. If the type is a variable
@@ -471,6 +473,7 @@ resolveTyRef tr = do
 
     RefTB  t        -> RefT  <$> resolveTyRef t
     ListTB t        -> ListT <$> resolveTyRef t
+    HashTB k v      -> HashT <$> resolveTyRef k <*> resolveTyRef v
     ArrTB as b      -> ArrT  <$> mapM resolveTyRef as <*> resolveTyRef b
 
 -- | Create a type reference at the "general" level, from a type tree.
@@ -492,6 +495,12 @@ abstractTy ty = evalStateT (absT ty) H.empty
     absT AtomT       = genTy $ AtomTB
     absT (RefT  t)   = absT t >>= genTy . RefTB
     absT (ListT t)   = absT t >>= genTy . ListTB
+
+    absT (HashT k v) = do
+      ktr <- absT k
+      vtr <- absT v
+      genTy (HashTB ktr vtr)
+
     absT (ArrT as b) = do
       atrs <- mapM absT as
       btr  <- absT b
@@ -515,6 +524,12 @@ initialDefs = H.fromList <$> mapM absDef ts
          , ("_new",    ArrT [VarT "a"] (RefT (VarT "a")))
          , ("_get",    ArrT [RefT (VarT "a")] (VarT "a"))
          , ("_set",    ArrT [RefT (VarT "a"), VarT "a"] (VarT "a"))
+         , ("_hash",   ArrT [] (HashT (VarT "k") (VarT "v")))
+         , ("_lookup", ArrT [HashT (VarT "k") (VarT "v"), VarT "k"] (VarT "v"))
+         , ("_update", ArrT [HashT (VarT "k") (VarT "v"), VarT "k", VarT "v"] (VarT "v"))
+         , ("_syntax", HashT AtomT (VarT "v"))
+         , ("_debug",  ArrT [] BoolT)
+         , ("_print",  ArrT [StrT] StrT)
          ]
 
 -- | Concrete Monad Transformer Stack satisfying the @ MonadInfer @

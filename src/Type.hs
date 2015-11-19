@@ -19,11 +19,13 @@ import Structure (shapeEq)
 import Token (Id)
 
 data Ty v    = BoolT | NumT | StrT | AtomT | VarT v
-             | RefT (Ty v) | ListT (Ty v) | ArrT [Ty v] (Ty v)
+             | RefT (Ty v) | ListT (Ty v) | HashT (Ty v) (Ty v)
+             | ArrT [Ty v] (Ty v)
                deriving Eq
 
 data TyB v a = BoolTB | NumTB | StrTB | AtomTB | VarTB v
-             | RefTB a | ListTB a | ArrTB [a] a
+             | RefTB a | ListTB a | HashTB a a
+             | ArrTB [a] a
                deriving (Eq, Show, P.Foldable, Functor, Traversable)
 
 type instance Base (Ty v) = TyB v
@@ -35,23 +37,26 @@ instance Foldable (Ty v) where
   project (RefT r)    = RefTB r
   project (VarT v)    = VarTB v
   project (ListT t)   = ListTB t
+  project (HashT k v) = HashTB k v
   project (ArrT as a) = ArrTB as a
 
 instance Show (Ty Id) where
-  show BoolT               = "bool"
-  show NumT                = "num"
-  show StrT                = "str"
-  show AtomT               = "atom"
-  show (RefT r)            = "ref " ++ wrap r
-  show (VarT x)            = "'" ++ x
-  show (ListT t)           = "[" ++ show t ++ "]"
-  show (ArrT as b)         = showFormals as ++ " -> " ++ show b
+  show BoolT       = "bool"
+  show NumT        = "num"
+  show StrT        = "str"
+  show AtomT       = "atom"
+  show (RefT r)    = "ref " ++ wrap r
+  show (VarT x)    = "'" ++ x
+  show (ListT t)   = "[" ++ show t ++ "]"
+  show (HashT k v) = "{" ++ show k ++ " => " ++ show v ++ "}"
+  show (ArrT as b) = showFormals as ++ " -> " ++ show b
     where
       showFormals [f]   = show f
       showFormals fs    = "(" ++  intercalate ", " (map show fs) ++ ")"
 
 wrap :: Ty Id -> String
 wrap t@(ArrT _ _) = "(" ++ show t ++ ")"
+wrap t@(RefT _)   = "(" ++ show t ++ ")"
 wrap t            = show t
 
 alphaEq :: Ty Id -> Ty Id -> Bool
