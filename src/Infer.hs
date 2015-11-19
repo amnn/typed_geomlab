@@ -185,6 +185,7 @@ printTyRef = p 0
         VarTB (FreeV n) -> prn $ "var: " ++ n
         VarTB (FwdV f)  -> prn "var: ~~>" >> p (off + 2) f
 
+        RefTB  t   -> prn "ref: " >> p (off + 2) t
         ListTB t   -> prn "list: " >> p (off + 2) t
         ArrTB as r -> do
           prn "fn: "
@@ -467,8 +468,10 @@ resolveTyRef tr = do
     NumTB           -> return $ NumT
     StrTB           -> return $ StrT
     AtomTB          -> return $ AtomT
+
+    RefTB  t        -> RefT  <$> resolveTyRef t
     ListTB t        -> ListT <$> resolveTyRef t
-    ArrTB as b      -> ArrT <$> mapM resolveTyRef as <*> resolveTyRef b
+    ArrTB as b      -> ArrT  <$> mapM resolveTyRef as <*> resolveTyRef b
 
 -- | Create a type reference at the "general" level, from a type tree.
 abstractTy :: MonadST m => Ty Id -> m (TyRef (World m))
@@ -487,6 +490,7 @@ abstractTy ty = evalStateT (absT ty) H.empty
     absT NumT        = genTy $ NumTB
     absT StrT        = genTy $ StrTB
     absT AtomT       = genTy $ AtomTB
+    absT (RefT  t)   = absT t >>= genTy . RefTB
     absT (ListT t)   = absT t >>= genTy . ListTB
     absT (ArrT as b) = do
       atrs <- mapM absT as
@@ -508,6 +512,9 @@ initialDefs = H.fromList <$> mapM absDef ts
          , (":",       ArrT [VarT "a", ListT (VarT "a")] (ListT (VarT "a")))
          , ("true",    BoolT)
          , ("false",   BoolT)
+         , ("_new",    ArrT [VarT "a"] (RefT (VarT "a")))
+         , ("_get",    ArrT [RefT (VarT "a")] (VarT "a"))
+         , ("_set",    ArrT [RefT (VarT "a"), VarT "a"] (VarT "a"))
          ]
 
 -- | Concrete Monad Transformer Stack satisfying the @ MonadInfer @

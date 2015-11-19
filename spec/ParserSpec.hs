@@ -205,3 +205,16 @@ spec = do
     , Eval (LSectS (numB 1) ":")
     , Eval (LSectS (atomB "foo") ":")
     ]
+
+  parseFile "test/gen_sym.geom" $
+    [ Def "labcount" (AppS "_new" [numB 0])
+    , Def "label"    (FnS [ FnArm "label" []
+                              (AppS "_set" [ VarS "labcount"
+                                           , AppS "+" [ AppS "_get" [VarS "labcount"]
+                                                      , numB 1
+                                                      ]
+                                           ])
+                              Nothing
+                          ])
+    , Eval (AppS "label" [])
+    ]

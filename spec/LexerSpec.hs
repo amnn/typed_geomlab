@@ -187,3 +187,15 @@ spec = do
     , LPar, Num 1, BinOp ":", RPar, Semi
     , LPar, Atom "foo", BinOp ":", RPar, Semi
     ]
+
+  lexFile "test/gen_sym.geom" $
+    [ Define, Ident "labcount", BinOp "=", Ident "_new", LPar, Num 0, RPar, Semi
+
+    , Define, Ident "label", LPar, RPar
+    , BinOp "=", Ident "_set"
+    , LPar, Ident "labcount"
+    , Comma, Ident "_get", LPar, Ident "labcount", RPar
+    , BinOp "+", Num 1, RPar, Semi
+
+    , Ident "label", LPar, RPar, Semi
+    ]
