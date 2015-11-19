@@ -1,95 +1,96 @@
 module InferSpec where
 
 import SpecHelper
+import Infer
+import Sugar
+import Token
 import Type
+
+def :: Id -> Ty Id -> Para (Either TyError (Ty Id))
+def x = Def x . Right
+
+eval :: Ty Id -> Para (Either TyError (Ty Id))
+eval = Eval . Right
 
 spec :: Spec
 spec = do
   typeCheckFile "test/compose.geom" $
-    map Right
-      [ ArrT [ ArrT [VarT "b"] (VarT "c")
-             , ArrT [VarT "a"] (VarT "b")
-             ]
-             ( ArrT [VarT "a"] (VarT "c"))
+    [ def "." $ ArrT [ ArrT [VarT "b"] (VarT "c")
+                     , ArrT [VarT "a"] (VarT "b")
+                     ]
+                     ( ArrT [VarT "a"] (VarT "c"))
 
-      , ArrT [NumT] NumT
-      , ArrT [NumT] NumT
-      ]
+    , def "add"  $ ArrT [NumT] NumT
+    , def "add2" $ ArrT [NumT] NumT
+    ]
 
   typeCheckFile "test/divmod.geom" $
-    map Right
-      [ ArrT [NumT, NumT] NumT
-      , ArrT [NumT, NumT] NumT
+    [ def "div" $ ArrT [NumT, NumT] NumT
+    , def "mod" $ ArrT [NumT, NumT] NumT
 
-      , NumT
-      , NumT
+    , def "a" $ NumT
+    , def "b" $ NumT
 
-      , NumT
-      , NumT
-      ]
+    , eval $ NumT
+    , eval $ NumT
+    ]
 
   typeCheckFile "test/empty.geom" $
-    map Right
-      [ ArrT [] NumT
-      ]
+    [ def "foo" $ ArrT [] NumT
+    ]
 
   typeCheckFile "test/folds.geom" $
-    map Right
-      [ ArrT [ArrT [VarT "a", VarT "b"] (VarT "b"), VarT "b", ListT (VarT "a")] (VarT "b")
-      , ArrT [ArrT [VarT "b", VarT "a"] (VarT "b"), VarT "b", ListT (VarT "a")] (VarT "b")
-      , ArrT [ArrT [VarT "a"] (VarT "b"), ListT (VarT "a")] (ListT (VarT "b"))
-      , ArrT [ArrT [VarT "a"] BoolT, ListT (VarT "a")] (ListT (VarT "a"))
-      , ArrT [ListT (VarT "a")] NumT
-      , ArrT [ListT (VarT "a")] (ListT (VarT "a"))
-      ]
+    [ def "foldr" $ ArrT [ArrT [VarT "a", VarT "b"] (VarT "b"), VarT "b", ListT (VarT "a")] (VarT "b")
+    , def "foldl" $ ArrT [ArrT [VarT "b", VarT "a"] (VarT "b"), VarT "b", ListT (VarT "a")] (VarT "b")
+    , def "map" $ ArrT [ArrT [VarT "a"] (VarT "b"), ListT (VarT "a")] (ListT (VarT "b"))
+    , def "filter" $ ArrT [ArrT [VarT "a"] BoolT, ListT (VarT "a")] (ListT (VarT "a"))
+    , def "length" $ ArrT [ListT (VarT "a")] NumT
+    , def "reverse" $ ArrT [ListT (VarT "a")] (ListT (VarT "a"))
+    ]
 
   typeCheckFile "test/let_gen.geom" $
-    map Right
-      [ ArrT [VarT "a"] (VarT "a")
-      , NumT
-      , AtomT
-      ]
+    [ def "id" $ ArrT [VarT "a"] (VarT "a")
+    , eval $ NumT
+    , eval $ AtomT
+    ]
 
   typeCheckFile "test/list_comp.geom" $
-    map Right
-      [ ArrT [ArrT [VarT "a", VarT "b"] (VarT "b"), ListT (VarT "a"), VarT "b"] (VarT "b")
-      , ArrT [NumT, NumT] (ListT NumT)
+    [ def "_mapa" $ ArrT [ArrT [VarT "a", VarT "b"] (VarT "b"), ListT (VarT "a"), VarT "b"] (VarT "b")
+    , def "_range" $ ArrT [NumT, NumT] (ListT NumT)
 
-      , NumT
-      , NumT
+    , def "a" $ NumT
+    , def "b" $ NumT
 
-      , ListT (ListT StrT)
-      , ListT (StrT)
+    , def "xs" $ ListT (ListT StrT)
+    , def "ys" $ ListT (StrT)
 
-      , BoolT
+    , def "y" BoolT
 
-      , ListT NumT
-      , ListT StrT
-      , ListT (ListT StrT)
-      ]
+    , eval $ ListT NumT
+    , eval $ ListT StrT
+    , eval $ ListT (ListT StrT)
+    ]
 
   typeCheckFile "test/monop_fn.geom" $
-    map Right [NumT, NumT, NumT]
+    map eval [NumT, NumT, NumT]
 
   typeCheckFile "test/neg.geom" $
-    map Right [NumT, NumT, NumT, NumT]
+    def "x" NumT : map eval [NumT, NumT, NumT]
 
   typeCheckFile "test/nest.geom" $
-    map Right [NumT]
+    [eval NumT]
 
   typeCheckFile "test/not.geom" $
-    map Right
-      [ ArrT [BoolT] BoolT
-      , BoolT
-      , BoolT
-      ]
+    [ def "not" $ ArrT [BoolT] BoolT
+    , eval $ BoolT
+    , eval $ BoolT
+    ]
 
   typeCheckFile "test/section.geom" $
-    map Right
-      [ ArrT [ArrT [VarT "a", VarT "b"] (VarT "c"), VarT "a"] (ArrT [VarT "b"] (VarT "c"))
-      , ArrT [ArrT [VarT "a", VarT "b"] (VarT "c"), VarT "b"] (ArrT [VarT "a"] (VarT "c"))
-      , ArrT [VarT "a"] (ListT (VarT "a"))
-      , ArrT [StrT] (ListT StrT)
-      , ArrT [ListT NumT] (ListT NumT)
-      , ArrT [ListT AtomT] (ListT AtomT)
-      ]
+    [ def "_lsect" $ ArrT [ArrT [VarT "a", VarT "b"] (VarT "c"), VarT "a"] (ArrT [VarT "b"] (VarT "c"))
+    , def "_rsect" $ ArrT [ArrT [VarT "a", VarT "b"] (VarT "c"), VarT "b"] (ArrT [VarT "a"] (VarT "c"))
+    , eval $ ArrT [VarT "a"] (ListT (VarT "a"))
+    , eval $ ArrT [StrT] (ListT StrT)
+    , eval $ ArrT [ListT NumT] (ListT NumT)
+    , eval $ ArrT [ListT AtomT] (ListT AtomT)
+    ]

@@ -27,14 +27,18 @@ parseFile = testFile "parses" (==) parse
 desugarFile :: FilePath -> [Para Expr] -> Spec
 desugarFile = testFile "desugars" (==) desugar
 
-typeCheckFile :: FilePath -> [Either TyError (Ty Id)] -> Spec
+typeCheckFile :: FilePath -> [Para (Either TyError (Ty Id))] -> Spec
 typeCheckFile = testFile "type checks" paraEq tc
   where
     paraEq xs ys = and (zipWith eq xs ys)
 
-    eq (Right u) (Right v) = alphaEq u v
-    eq (Left  e) (Left  f) = e == f
+    eq (Eval e)  (Eval f)  = eitherEq e f
+    eq (Def x a) (Def y b) = eitherEq a b && x == y
     eq _         _         = False
+
+    eitherEq (Right u) (Right v) = alphaEq u v
+    eitherEq (Left  e) (Left  f) = e == f
+    eitherEq _         _         = False
 
 type Result a = IO (Either String a)
 
@@ -55,7 +59,7 @@ desugar input = return (runAlex input pAndDExpr)
   where
     pAndDExpr = parseExpr >>= return . map (fmap desugarExpr)
 
-tc :: String -> Result ([Either TyError (Ty Id)])
+tc :: String -> Result ([Para (Either TyError (Ty Id))])
 tc input = return (runAlex input pDAndTCExpr)
   where
     pDAndTCExpr = typeCheck . map (fmap desugarExpr) <$> parseExpr

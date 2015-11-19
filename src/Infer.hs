@@ -520,7 +520,7 @@ type InferM s = ReaderT (ScopedState s)
 
 -- | Given a list of top-level statements, type check each one individually and
 -- give the type or error for each top-level operation.
-typeCheck :: [Para Expr] -> [Either TyError (Ty Id)]
+typeCheck :: [Para Expr] -> [Para (Either TyError (Ty Id))]
 typeCheck ps = runST $ evalStateT (mapM tcPara ps) =<< initialDefs
   where
     topScope im = runExceptT . flip runReaderT undefined $ do
@@ -528,13 +528,12 @@ typeCheck ps = runST $ evalStateT (mapM tcPara ps) =<< initialDefs
       gsRef <- newIRef $ GS {tyCtx, waitingToAdjust = [], nextTyVar = 0}
       local (const $ SS {gsRef, lvl = 0}) im
 
-    tcPara (Eval e) = topScope $ do
-      gloDefs <- get
-      etr     <- typeOf gloDefs e
+    tcPara (Eval e) = fmap Eval . topScope $ do
+      etr <- flip typeOf e =<< get
       cycleFree etr
       resolveTyRef etr
 
-    tcPara (Def x e) = topScope $ do
+    tcPara (Def x e) = fmap (Def x) . topScope $ do
       dtr <- newScope $ do
         evr <- newVar
         modify (H.insert x evr)

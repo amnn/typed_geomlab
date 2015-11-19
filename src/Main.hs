@@ -5,6 +5,7 @@ import Desugar (desugarExpr)
 import GLParser (parseExpr)
 import Infer (typeCheck)
 import Lexer
+import Sugar
 import System.Environment
 import Token
 
@@ -30,20 +31,19 @@ desugar = runAndFormat (mapM_ print) desugarM
     applyDesugar = map (fmap desugarExpr)
 
 tc :: String -> IO ()
-tc = runAndFormat fmt tcM
+tc = runAndFormat (mapM_ fmt) tcM
   where
-    fmt = mapM_ (either (putStrLn . ("Type Error: "++) . show) print)
-    tcM = typeCheck . map (fmap desugarExpr) <$> parseExpr
+    tcM                   = typeCheck . map (fmap desugarExpr) <$> parseExpr
+    fmt (Def x (Right t)) = putStrLn $ x ++ " :: " ++ show t
+    fmt (Def x (Left t))  = putStrLn $ "Error in definition of \'" ++ x ++ "\':\n" ++ show t
+    fmt (Eval et)         = either (putStrLn . ("Error in expression:\n"++) . show) print et
 
 processFile :: String -> IO ()
 processFile fname = do
-  putStrLn ("\n\nFile: " ++ fname ++ "\n")
+  putStrLn ("\n*** Checking " ++ fname ++ "\n")
   input <- readFile fname
-  putStrLn "*** Raw ***\n"
   putStrLn input
-  putStrLn "\n*** Desugared  ***\n"
-  desugar input
-  putStrLn "\n*** Type Checked ***\n"
+  putStrLn " --- \n"
   tc input
 
 main :: IO ()
