@@ -58,7 +58,7 @@ dequote :: String -> String
 dequote = tail . init
 
 strTok :: (String -> Token) -> AlexAction Lexeme
-strTok t (pos, _, _, rest) len = return (mkLex str pos)
+strTok t (pos, _, _, rest) len = return (mkLex len str pos)
   where
     str = t (take len rest)
 
@@ -77,8 +77,8 @@ op = strTok $ \x ->
          Just t  -> t
          Nothing -> BinOp x
 
-mkLex :: Token -> AlexPosn -> Lexeme
-mkLex t (AlexPn o l c) = L (S (P l c) o 1) t
+mkLex :: Int -> Token -> AlexPosn -> Lexeme
+mkLex len t (AlexPn o l c) = L (S (P l c) o len) t
 
 -- | Eat up nested comments and return the following token.
 skipComment :: AlexAction Lexeme

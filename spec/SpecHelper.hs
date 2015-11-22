@@ -1,6 +1,7 @@
 module SpecHelper
        ( module Test.Hspec
        , lexFile
+       , locLexFile
        , parseFile
        , desugarFile
        , typeCheckFile
@@ -21,6 +22,9 @@ import Type (Ty, alphaEq)
 
 lexFile :: FilePath -> [Token] -> Spec
 lexFile = testFile "lexes" (==) scanTokens
+
+locLexFile :: FilePath -> [Lexeme] -> Spec
+locLexFile = testFile "located lexes" (==) locScanTokens
 
 parseFile :: FilePath -> [Para Sugar] -> Spec
 parseFile = testFile "parses" (==) parse
@@ -51,6 +55,16 @@ scanTokens input = return (runAlex input loop)
               then return []
               else do rest <- loop
                       return (t:rest)
+
+locScanTokens :: String -> Result [Lexeme]
+locScanTokens input = return (runAlex input loop)
+  where
+    loop = do l@(L _ t) <- alexMonadScan
+              if t == Eof
+              then return []
+              else do rest <- loop
+                      return (l:rest)
+
 
 parse :: String -> Result [Para Sugar]
 parse input = return (runAlex input parseExpr)

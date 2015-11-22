@@ -1,6 +1,7 @@
 module LexerSpec where
 
 import SpecHelper
+import Location
 import Token
 
 spec :: Spec
@@ -39,31 +40,73 @@ spec = do
     , Ident "a", BinOp "mod", Ident "b", Semi
     ]
 
-  lexFile "test/monop_fn.geom" $
-    [ MonOp "~", LPar, Num 10.0, RPar, Semi
-    , Num (-10.0), Semi
-    , BinOp "-", LPar, Num (-10.0), RPar, Semi
+  locLexFile "test/monop_fn.geom" $
+    [ L (S (P 1 1) 0 1)   (MonOp "~")
+    , L (S (P 1 2) 1 1)   LPar
+    , L (S (P 1 3) 2 2)   (Num 10)
+    , L (S (P 1 5) 4 1)   RPar
+    , L (S (P 1 6) 5 1)   Semi
+    , L (S (P 1 8) 7 3)   (Num (-10))
+    , L (S (P 1 11) 10 1) Semi
+    , L (S (P 1 13) 12 1) (BinOp "-")
+    , L (S (P 1 14) 13 1) LPar
+    , L (S (P 1 15) 14 3) (Num (-10))
+    , L (S (P 1 18) 17 1) RPar
+    , L (S (P 1 19) 18 1) Semi
     ]
 
-  lexFile "test/neg.geom" $
-    [ Define, Ident "x", BinOp "=", Num 1.0, Semi
-    , BinOp "-", BinOp "-", Num 10.0, Semi
-    , Num 1.0, BinOp "+", BinOp "-"
-    , LPar, Ident "x", BinOp "+", Num 1.0, RPar, Semi
-    , Num 1.0, BinOp "+", BinOp "-", Ident "x", BinOp "+", Num 1.0, Semi
+  locLexFile "test/neg.geom" $
+    [ L (S (P 1 1) 0 6)   Define
+    , L (S (P 1 8) 7 1)   (Ident "x")
+    , L (S (P 1 10) 9 1)  (BinOp "=")
+    , L (S (P 1 12) 11 1) (Num 1)
+    , L (S (P 1 13) 12 1) Semi
+    , L (S (P 3 1) 15 1)  (BinOp "-")
+    , L (S (P 3 3) 17 1)  (BinOp "-")
+    , L (S (P 3 5) 19 2)  (Num 10)
+    , L (S (P 3 7) 21 1)  Semi
+    , L (S (P 3 9) 23 1)  (Num 1)
+    , L (S (P 3 11) 25 1) (BinOp "+")
+    , L (S (P 3 13) 27 1) (BinOp "-")
+    , L (S (P 3 15) 29 1) LPar
+    , L (S (P 3 16) 30 1) (Ident "x")
+    , L (S (P 3 18) 32 1) (BinOp "+")
+    , L (S (P 3 20) 34 1) (Num 1)
+    , L (S (P 3 21) 35 1) RPar
+    , L (S (P 3 22) 36 1) Semi
+    , L (S (P 3 24) 38 1) (Num 1)
+    , L (S (P 3 26) 40 1) (BinOp "+")
+    , L (S (P 3 28) 42 1) (BinOp "-")
+    , L (S (P 3 29) 43 1) (Ident "x")
+    , L (S (P 3 31) 45 1) (BinOp "+")
+    , L (S (P 3 33) 47 1) (Num 1)
+    , L (S (P 3 34) 48 1) Semi
     ]
 
-  lexFile "test/not.geom" $
-    [ Define
-    , MonOp "not", LPar, Ident "p", RPar, BinOp "="
-    , Ident "false", When, Ident "p"
-    , VBar
-    , MonOp "not", LPar, Anon, RPar, BinOp "="
-    , Ident "true"
-    , Semi
-
-    , MonOp "not", Ident "true", Semi
-    , MonOp "not", Ident "false", Semi
+  locLexFile "test/not.geom" $
+    [ L (S (P 1 1) 0 6)   Define
+    , L (S (P 1 8) 7 3)   (MonOp "not")
+    , L (S (P 1 11) 10 1) LPar
+    , L (S (P 1 12) 11 1) (Ident "p")
+    , L (S (P 1 13) 12 1) RPar
+    , L (S (P 1 15) 14 1) (BinOp "=")
+    , L (S (P 1 17) 16 5) (Ident "false")
+    , L (S (P 1 23) 22 4) When
+    , L (S (P 1 28) 27 1) (Ident "p")
+    , L (S (P 2 6) 34 1)  VBar
+    , L (S (P 2 8) 36 3)  (MonOp "not")
+    , L (S (P 2 11) 39 1) LPar
+    , L (S (P 2 12) 40 1) Anon
+    , L (S (P 2 13) 41 1) RPar
+    , L (S (P 2 15) 43 1) (BinOp "=")
+    , L (S (P 2 17) 45 4) (Ident "true")
+    , L (S (P 2 21) 49 1) Semi
+    , L (S (P 4 1) 52 3)  (MonOp "not")
+    , L (S (P 4 5) 56 4)  (Ident "true")
+    , L (S (P 4 9) 60 1)  Semi
+    , L (S (P 5 1) 62 3)  (MonOp "not")
+    , L (S (P 5 5) 66 5)  (Ident "false")
+    , L (S (P 5 10) 71 1) Semi
     ]
 
   lexFile "test/list_comp.geom" $
@@ -108,11 +151,22 @@ spec = do
     , Semi
     ]
 
-  lexFile "test/empty.geom" $
-    [ Define, Ident "foo", LPar, RPar, BinOp "="
-    , Num 1.0, When, Ident "true"
-    , VBar, Ident "foo", LPar, RPar, BinOp "=", Num 2.0
-    , Semi
+  locLexFile "test/empty.geom" $
+    [ L (S (P 1 1) 0 6)   Define
+    , L (S (P 1 8) 7 3)   (Ident "foo")
+    , L (S (P 1 11) 10 1) LPar
+    , L (S (P 1 12) 11 1) RPar
+    , L (S (P 1 14) 13 1) (BinOp "=")
+    , L (S (P 1 16) 15 1) (Num 1)
+    , L (S (P 1 18) 17 4) When
+    , L (S (P 1 23) 22 4) (Ident "true")
+    , L (S (P 2 6) 32 1)  VBar
+    , L (S (P 2 8) 34 3)  (Ident "foo")
+    , L (S (P 2 11) 37 1) LPar
+    , L (S (P 2 12) 38 1) RPar
+    , L (S (P 2 14) 40 1) (BinOp "=")
+    , L (S (P 2 16) 42 1) (Num 2)
+    , L (S (P 2 17) 43 1) Semi
     ]
 
   lexFile "test/folds.geom" $
@@ -188,14 +242,35 @@ spec = do
     , LPar, Atom "foo", BinOp ":", RPar, Semi
     ]
 
-  lexFile "test/gen_sym.geom" $
-    [ Define, Ident "labcount", BinOp "=", Ident "_new", LPar, Num 0, RPar, Semi
+  locLexFile "test/gen_sym.geom" $
+    [ L (S (P 1 1) 0 6)   Define
+    , L (S (P 1 8) 7 8)   (Ident "labcount")
+    , L (S (P 1 17) 16 1) (BinOp "=")
+    , L (S (P 1 19) 18 4) (Ident "_new")
+    , L (S (P 1 23) 22 1) LPar
+    , L (S (P 1 24) 23 1) (Num 0)
+    , L (S (P 1 25) 24 1) RPar
+    , L (S (P 1 26) 25 1) Semi
 
-    , Define, Ident "label", LPar, RPar
-    , BinOp "=", Ident "_set"
-    , LPar, Ident "labcount"
-    , Comma, Ident "_get", LPar, Ident "labcount", RPar
-    , BinOp "+", Num 1, RPar, Semi
-
-    , Ident "label", LPar, RPar, Semi
+    , L (S (P 2 1) 27 6)  Define
+    , L (S (P 2 8) 34 5)  (Ident "label")
+    , L (S (P 2 13) 39 1) LPar
+    , L (S (P 2 14) 40 1) RPar
+    , L (S (P 2 16) 42 1) (BinOp "=")
+    , L (S (P 2 18) 44 4) (Ident "_set")
+    , L (S (P 2 22) 48 1) LPar
+    , L (S (P 2 23) 49 8) (Ident "labcount")
+    , L (S (P 2 31) 57 1) Comma
+    , L (S (P 2 33) 59 4) (Ident "_get")
+    , L (S (P 2 37) 63 1) LPar
+    , L (S (P 2 38) 64 8) (Ident "labcount")
+    , L (S (P 2 46) 72 1) RPar
+    , L (S (P 2 48) 74 1) (BinOp "+")
+    , L (S (P 2 50) 76 1) (Num 1)
+    , L (S (P 2 51) 77 1) RPar
+    , L (S (P 2 52) 78 1) Semi
+    , L (S (P 3 1) 80 5)  (Ident "label")
+    , L (S (P 3 6) 85 1)  LPar
+    , L (S (P 3 7) 86 1)  RPar
+    , L (S (P 3 8) 87 1)  Semi
     ]
