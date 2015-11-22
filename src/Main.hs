@@ -5,6 +5,7 @@ import Desugar (desugarExpr)
 import GLParser (parseExpr)
 import Infer (typeCheck)
 import Lexer
+import Location
 import Sugar
 import System.Environment
 import Token
@@ -15,7 +16,7 @@ runAndFormat fmt am input = either putStrLn fmt (runAlex input am)
 scanTokens :: String -> IO ()
 scanTokens = runAndFormat (putStrLn . unwords . map show) loop
   where
-    loop = do (L t _ _) <- alexMonadScan
+    loop = do (L _ t) <- alexMonadScan
               if t == Eof
               then return []
               else do rest <- loop

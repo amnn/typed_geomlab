@@ -1,6 +1,7 @@
 module Token where
 
 import qualified Data.HashMap as H
+import Location
 
 type Id = String
 data Token =
@@ -29,7 +30,7 @@ data Token =
   | Str String
   deriving Eq
 
-data Lexeme = L Token Int Int deriving Eq
+type Lexeme = Located Token
 
 instance Show Token where
   show Bra       = "["
@@ -58,9 +59,6 @@ instance Show Token where
   show (Atom x)  = "#" ++ x
   show (Num n)   = show n
   show (Str s)   = show s
-
-instance Show Lexeme where
-  show (L t l c) = concat [show t, " at line ", show l, ", column ", show c]
 
 data Assoc = LeftA  { pri :: Int }
            | RightA { pri :: Int }

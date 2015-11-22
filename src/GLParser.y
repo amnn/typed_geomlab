@@ -3,6 +3,7 @@ module GLParser where
 
 import Lexer
 import Literal
+import Location
 import Patt
 import Sugar
 import Token
@@ -11,39 +12,39 @@ import Token
 
 %name        parseExpr Top
 %error     { parseError }
-%lexer     { getToken } { L Eof l c }
+%lexer     { getToken } { L s Eof }
 %monad     { Alex }
 %tokentype { Lexeme }
 
-%token '('      { L LPar l c }
-       ')'      { L RPar l c }
-       '['      { L Bra l c }
-       ']'      { L Ket l c }
-       ','      { L Comma l c }
-       ';'      { L Semi l c }
-       '|'      { L VBar l c }
-       '_'      { L Anon l c }
-       '>>'     { L AndThen l c }
-       '<-'     { L Gen l c }
-       '..'     { L Range l c }
-       '+'      { L (BinOp "+") l c }
-       '-'      { L (BinOp "-") l c }
-       '='      { L (BinOp "=") l c }
-       ':'      { L (BinOp ":") l c }
-       num      { L (Num   $$) l c }
-       str      { L (Str   $$) l c }
-       atom     { L (Atom  $$) l c }
-       ident    { L (Ident $$) l c }
-       binop    { L (BinOp $$) l c }
-       monop    { L (MonOp $$) l c }
-       define   { L Define l c }
-       function { L Function l c }
-       else     { L Else l c }
-       if       { L If l c }
-       in       { L In l c }
-       let      { L Let l c }
-       then     { L Then l c }
-       when     { L When l c }
+%token '('      { L s LPar }
+       ')'      { L s RPar }
+       '['      { L s Bra }
+       ']'      { L s Ket }
+       ','      { L s Comma }
+       ';'      { L s Semi }
+       '|'      { L s VBar }
+       '_'      { L s Anon }
+       '>>'     { L s AndThen }
+       '<-'     { L s Gen }
+       '..'     { L s Range }
+       '+'      { L s (BinOp "+") }
+       '-'      { L s (BinOp "-") }
+       '='      { L s (BinOp "=") }
+       ':'      { L s (BinOp ":") }
+       num      { L s (Num   $$) }
+       str      { L s (Str   $$) }
+       atom     { L s (Atom  $$) }
+       ident    { L s (Ident $$) }
+       binop    { L s (BinOp $$) }
+       monop    { L s (MonOp $$) }
+       define   { L s Define }
+       function { L s Function }
+       else     { L s Else }
+       if       { L s If }
+       in       { L s In }
+       let      { L s Let }
+       then     { L s Then }
+       when     { L s When }
 
 %%
 -- Top Level
@@ -58,9 +59,9 @@ Para ::                { Para Sugar }
 Para : define Decl ';' { declToDef $2 }
      | Expr ';'        { Eval $1 }
 
-Decl ::               { Decl }
+Decl ::            { Decl }
 Decl : Id '=' Expr { Decl $1 $3 }
-     | FnBody         {% fnToDecl (reverse $1) }
+     | FnBody      {% fnToDecl (reverse $1) }
 
 FnBody ::                 { [FnArm] }
 FnBody : FnArm            { [$1] }
@@ -203,7 +204,7 @@ fnToDecl body@(a:as)
     name  (FnArm id _ _ _) = id
     arity (FnArm _ fs _ _) = length fs
 
-fnToDecl [] = error "Internal Error, Empty function definition."
+fnToDecl [] = error "fnToDecl: Empty function definition."
 
 -- Operator Associativity Parsing
 mkOpExpr :: OpTree Sugar -> Sugar

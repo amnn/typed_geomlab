@@ -4,7 +4,7 @@
 module Lexer where
 
 import Data.Char (chr)
-
+import Location
 import Token
 }
 
@@ -78,7 +78,7 @@ op = strTok $ \x ->
          Nothing -> BinOp x
 
 mkLex :: Token -> AlexPosn -> Lexeme
-mkLex t (AlexPn _ l c) = L t l c
+mkLex t (AlexPn o l c) = L (S (P l c) o 1) t
 
 -- | Eat up nested comments and return the following token.
 skipComment :: AlexAction Lexeme
@@ -95,7 +95,7 @@ skipComment _ _ = alexGetInput >>= go 1
     fromByte     = chr . fromIntegral
 
 alexEOF :: Alex Lexeme
-alexEOF = return (L Eof 0 0)
+alexEOF = return (L emptySpan Eof)
 
 scanError :: String -> AlexAction a
 scanError msg (pos, _, _, str) _ =

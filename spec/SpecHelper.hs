@@ -12,6 +12,7 @@ import Expr
 import GLParser (parseExpr)
 import Infer (TyError, typeCheck)
 import Lexer
+import Location
 import Sugar
 import Test.Hspec
 import Test.HUnit (assertFailure)
@@ -45,7 +46,7 @@ type Result a = IO (Either String a)
 scanTokens :: String -> Result [Token]
 scanTokens input = return (runAlex input loop)
   where
-    loop = do (L t _ _) <- alexMonadScan
+    loop = do (L _ t) <- alexMonadScan
               if t == Eof
               then return []
               else do rest <- loop
