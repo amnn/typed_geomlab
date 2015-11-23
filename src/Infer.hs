@@ -20,6 +20,7 @@ import Debug.Trace (traceM)
 import DynArray
 import Expr
 import Literal
+import Location
 import Patt
 import Structure (shapeEq)
 import Sugar
@@ -437,6 +438,7 @@ typeOf gloDefs = check
 
     check (SeqE a b) = check a >> check b
 
+    check (LocE le) = check (dislocate le)
     check _ = newVar
 
     checkArm etr (p, a) = do

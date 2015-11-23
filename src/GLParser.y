@@ -60,18 +60,18 @@ Para : define Decl ';' { declToDef $2 }
      | Expr ';'        { Eval (dislocate $1) }
 
 Decl ::            { Located Decl }
-Decl : Id '=' Expr { Decl <@> $1 <*> $3 }
+Decl : Id '=' Expr { Decl <@> $1 <*> reify $3 }
      | FnBody      {% fnToDecl $ (reverse $1) }
 
 FnBody ::                 { [Located FnArm] }
 FnBody : FnArm            { [$1] }
        | FnBody '|' FnArm { $3 : $1 }
 
-FnArm ::                          { Located FnArm }
-FnArm : FnLhs '=' Expr           { mkFnArm $1 $3 (pure Nothing) }
-      | FnLhs '=' Expr when Expr { mkFnArm $1 $3 (Just <@> $5) }
+FnArm ::                         { Located FnArm }
+FnArm : FnLhs '=' Expr           { mkFnArm $1 (reify $3) (pure Nothing) }
+      | FnLhs '=' Expr when Expr { mkFnArm $1 (reify $3) (Just <@> (reify $5)) }
 
-FnLhs :: { (Located Id, Located [Patt]) }
+FnLhs ::                            { (Located Id, Located [Patt]) }
 FnLhs : monop '(' Patt ')'          { (ident $1, loc [$3]) }
       | binop '(' Patt ',' Patt ')' { (ident $1, loc [$3, $5]) }
       | ident Formals               { (ident $1, $2) }
@@ -84,23 +84,23 @@ Id : ident { ident $1 }
 -- Expressions
 Expr ::                      { Located Sugar }
 Expr : Cond                  { $1 }
-     | let Decl in Expr      { declToLet $2 $4 }
-     | function Formals Expr { $1 *> (FnS <@> loc [FnArm "" <@> $2 <*> $3 <*> pure Nothing]) }
+     | let Decl in Expr      { declToLet $2 (reify $4) }
+     | function Formals Expr { $1 *> (FnS <@> loc [FnArm "" <@> $2 <*> reify $3 <*> pure Nothing]) }
      | Cond '>>' Expr        { SeqS <@> $1 <*> $3 }
 
 ExprOrSect ::                      { Located Sugar }
-ExprOrSect : let Decl in Expr      { declToLet $2 $4 }
-           | function Formals Expr { $1 *> (FnS <@> loc [FnArm "" <@> $2 <*> $3 <*> pure Nothing]) }
+ExprOrSect : let Decl in Expr      { declToLet $2 (reify $4) }
+           | function Formals Expr { $1 *> (FnS <@> loc [FnArm "" <@> $2 <*> reify $3 <*> pure Nothing]) }
            | CondOrSect            { $1 }
-           | Cond '>>' Expr        { SeqS <@> $1 <*> $3 }
+           | Cond '>>' Expr        { SeqS <@> reify $1 <*> reify $3 }
 
 Cond ::                            { Located Sugar }
 Cond : Term                        { $1 }
-     | if Cond then Cond else Cond { IfS <@> $2 <*> $4 <*> $6 }
+     | if Cond then Cond else Cond { IfS <@> reify $2 <*> reify $4 <*> reify $6 }
 
 CondOrSect ::                            { Located Sugar }
 CondOrSect : TermOrSect                  { $1 }
-           | if Cond then Cond else Cond { IfS <@> $2 <*> $4 <*> $6 }
+           | if Cond then Cond else Cond { IfS <@> reify $2 <*> reify $4 <*> reify $6 }
 
 Term ::       { Located Sugar }
 Term : Factor { $1 }
@@ -128,15 +128,15 @@ BinOpNoMinus : '+'   { ident $1 }
 
 Factor ::             { Located Sugar }
 Factor : Primary      { $1 }
-       | monop Factor { AppS <@> (ident $1) <*> (loc [$2]) }
-       | '-' Factor   { AppS <@> ($1 *> pure "~") <*> (loc [$2]) }
+       | monop Factor { apply (ident $1) [$2] }
+       | '-' Factor   { apply ($1 *> pure "~") [$2] }
 
 Primary ::                          { Located Sugar }
 Primary : num                       { val $1 }
         | atom                      { val $1 }
         | str                       { val $1 }
         | ident                     { val $1 }
-        | ident '(' Actuals ')'     { AppS <@> ident $1 <*> ($2 *> loc (reverse $3) <* $4) }
+        | ident '(' Actuals ')'     { apply (ident $1) (reverse $3) <* $4 }
         | '[' ListExpr ']'          { $1 *> $2 <* $3 }
         | '(' monop ')'             { $1 *> val $2 <* $3 }
         | '(' BinOp ')'             { $1 *> (VarS <@> $2) <* $3 }
@@ -191,10 +191,17 @@ ListPatt : {- empty -}       { [] }
 
 {
 
+-- | Redefining fmap to get around the fact that Happy treats `$>` specially.
 (<@>) :: Functor f => (a -> b) -> f a -> f b
 (<@>) = (<$>)
 
 -- Source Mapping
+reify :: Located Sugar -> Located Sugar
+reify ls@(L s _) = L s (LocS ls)
+
+apply :: Located Id -> [Located Sugar] -> Located Sugar
+apply x xs = AppS <@> x <*> loc (reify <$> xs)
+
 val :: Lexeme -> Located Sugar
 val = fmap trn
   where
@@ -252,7 +259,7 @@ fnToDecl [] = error "fnToDecl: Empty function definition."
 -- Operator Associativity Parsing
 mkOpExpr :: OpTree (Located Sugar) -> Located Sugar
 mkOpExpr (Leaf e)   = e
-mkOpExpr (Op i l r) = AppS i <@> loc [mkOpExpr l, mkOpExpr r]
+mkOpExpr (Op i l r) = apply (pure i) [mkOpExpr l, mkOpExpr r]
 
 parseError :: Lexeme -> Alex a
 parseError l = alexError msg

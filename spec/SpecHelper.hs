@@ -35,13 +35,13 @@ parseFile :: FilePath -> [Para Sugar] -> Spec
 parseFile = testFile "parses" (==) parse
 
 locParseFile :: FilePath -> [Para Sugar] -> Spec
-locParseFile = testFile "parses" (==) locParse
+locParseFile = testFile "located parses" (==) locParse
 
 desugarFile :: FilePath -> [Para Expr] -> Spec
 desugarFile = testFile "desugars" (==) desugar
 
 locDesugarFile :: FilePath -> [Para Expr] -> Spec
-locDesugarFile = testFile "desugars" (==) locDesugar
+locDesugarFile = testFile "located desugars" (==) locDesugar
 
 typeCheckFile :: FilePath -> [Para (Either TyError (Ty Id))] -> Spec
 typeCheckFile = testFile "type checks" paraEq tc
