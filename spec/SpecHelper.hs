@@ -1,13 +1,18 @@
+{-# LANGUAGE TypeFamilies #-}
 module SpecHelper
        ( module Test.Hspec
        , lexFile
        , locLexFile
        , parseFile
+       , locParseFile
        , desugarFile
+       , locDesugarFile
        , typeCheckFile
        ) where
 
+import Prelude hiding (Foldable)
 import Control.Monad (unless)
+import Data.Functor.Foldable
 import Desugar (desugarExpr)
 import Expr
 import GLParser (parseExpr)
@@ -29,8 +34,14 @@ locLexFile = testFile "located lexes" (==) locScanTokens
 parseFile :: FilePath -> [Para Sugar] -> Spec
 parseFile = testFile "parses" (==) parse
 
+locParseFile :: FilePath -> [Para Sugar] -> Spec
+locParseFile = testFile "parses" (==) locParse
+
 desugarFile :: FilePath -> [Para Expr] -> Spec
 desugarFile = testFile "desugars" (==) desugar
+
+locDesugarFile :: FilePath -> [Para Expr] -> Spec
+locDesugarFile = testFile "desugars" (==) locDesugar
 
 typeCheckFile :: FilePath -> [Para (Either TyError (Ty Id))] -> Spec
 typeCheckFile = testFile "type checks" paraEq tc
@@ -65,14 +76,35 @@ locScanTokens input = return (runAlex input loop)
               else do rest <- loop
                       return (l:rest)
 
+stripLocS :: Sugar -> Sugar
+stripLocS = cata s
+  where
+    s (LocSB le) = dislocate le
+    s e          = embed e
+
+stripLocE :: Expr -> Expr
+stripLocE = cata s
+  where
+    s (LocEB le) = dislocate le
+    s e          = embed e
 
 parse :: String -> Result [Para Sugar]
-parse input = return (runAlex input parseExpr)
+parse input = return (runAlex input pAndSExpr)
+  where
+    pAndSExpr = map (fmap stripLocS) <$> parseExpr
+
+locParse :: String -> Result [Para Sugar]
+locParse input = return (runAlex input parseExpr)
 
 desugar :: String -> Result [Para Expr]
 desugar input = return (runAlex input pAndDExpr)
   where
-    pAndDExpr = parseExpr >>= return . map (fmap desugarExpr)
+    pAndDExpr = map (fmap (stripLocE . desugarExpr)) <$> parseExpr
+
+locDesugar :: String -> Result [Para Expr]
+locDesugar input = return (runAlex input pAndDExpr)
+  where
+    pAndDExpr = map (fmap desugarExpr) <$> parseExpr
 
 tc :: String -> Result ([Para (Either TyError (Ty Id))])
 tc input = return (runAlex input pDAndTCExpr)

@@ -83,3 +83,17 @@ instance Foldable Sugar where
   project (LetS x a b)     = LetSB x a b
   project (SeqS a b)       = SeqSB a b
   project (LocS ls)        = LocSB ls
+
+instance Unfoldable Sugar where
+  embed (LitSB s)         = LitS s
+  embed (ListCompSB s gs) = ListCompS s gs
+  embed (RangeSB from to) = RangeS from to
+  embed (VarSB x)         = VarS x
+  embed (IfSB c t e)      = IfS c t e
+  embed (FnSB arms)       = FnS arms
+  embed (AppSB f xs)      = AppS f xs
+  embed (LSectSB f x)     = LSectS f x
+  embed (RSectSB x f)     = RSectS x f
+  embed (LetSB x a b)     = LetS x a b
+  embed (SeqSB a b)       = SeqS a b
+  embed (LocSB ls)        = LocS ls
