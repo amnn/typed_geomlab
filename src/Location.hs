@@ -44,7 +44,10 @@ instance Monoid Span where
   mappend Floating s = s
 
   mappend (S p m v) (S q o w) =
-    S (p `min` q) (m `min` o) (m + v `max` o + w)
+    S (p `min` q) off (end - off)
+    where
+      off = m `min` o
+      end = (m + v) `max` (o + w)
 
 instance Applicative Located where
   pure                = L Floating
