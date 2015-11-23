@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
+{-# LANGUAGE TypeFamilies, DeriveFunctor, DeriveFoldable, DeriveTraversable, PatternGuards #-}
 
 module Sugar where
 
@@ -60,12 +60,14 @@ instance EmbedsLit Sugar where
   embedLit = LitS
 
 -- | Convert a generic assignment to a top-level assignment.
-declToDef :: Decl -> Para Sugar
-declToDef (Decl x e) = Def x e
+declToDef :: Located Decl -> Para Sugar
+declToDef ld | Decl x e <- dislocate ld = Def x e
 
 -- | Conversion from a generic assignment to a let expression.
-declToLet :: Decl -> Sugar -> Sugar
-declToLet (Decl x e) = LetS x e
+declToLet :: Located Decl -> Located Sugar -> Located Sugar
+declToLet ld le = toLet <$> ld <*> le
+  where
+    toLet (Decl x e) = LetS x e
 
 type instance Base Sugar = SugarB
 instance Foldable Sugar where

@@ -31,12 +31,12 @@ import Token
        '-'      { L s (BinOp "-") }
        '='      { L s (BinOp "=") }
        ':'      { L s (BinOp ":") }
-       num      { L s (Num   $$) }
-       str      { L s (Str   $$) }
-       atom     { L s (Atom  $$) }
-       ident    { L s (Ident $$) }
-       binop    { L s (BinOp $$) }
-       monop    { L s (MonOp $$) }
+       num      { L s (Num   n) }
+       str      { L s (Str   t) }
+       atom     { L s (Atom  a) }
+       ident    { L s (Ident i) }
+       binop    { L s (BinOp b) }
+       monop    { L s (MonOp m) }
        define   { L s Define }
        function { L s Function }
        else     { L s Else }
@@ -57,159 +57,202 @@ Paras : Para        { [$1] }
 
 Para ::                { Para Sugar }
 Para : define Decl ';' { declToDef $2 }
-     | Expr ';'        { Eval $1 }
+     | Expr ';'        { Eval (dislocate $1) }
 
-Decl ::            { Decl }
-Decl : Id '=' Expr { Decl $1 $3 }
-     | FnBody      {% fnToDecl (reverse $1) }
+Decl ::            { Located Decl }
+Decl : Id '=' Expr { Decl <@> $1 <*> $3 }
+     | FnBody      {% fnToDecl $ (reverse $1) }
 
-FnBody ::                 { [FnArm] }
+FnBody ::                 { [Located FnArm] }
 FnBody : FnArm            { [$1] }
        | FnBody '|' FnArm { $3 : $1 }
 
-FnArm ::                          { FnArm }
-FnArm : FnLhs '=' Expr           { mkFnArm $1 $3 Nothing }
-      | FnLhs '=' Expr when Expr { mkFnArm $1 $3 (Just $5) }
+FnArm ::                          { Located FnArm }
+FnArm : FnLhs '=' Expr           { mkFnArm $1 $3 (pure Nothing) }
+      | FnLhs '=' Expr when Expr { mkFnArm $1 $3 (Just <@> $5) }
 
-FnLhs :: { (Id, [Patt]) }
-FnLhs : monop '(' Patt ')'          { ($1, [$3]) }
-      | binop '(' Patt ',' Patt ')' { ($1, [$3, $5]) }
-      | ident Formals               { ($1, $2) }
+FnLhs :: { (Located Id, Located [Patt]) }
+FnLhs : monop '(' Patt ')'          { (ident $1, loc [$3]) }
+      | binop '(' Patt ',' Patt ')' { (ident $1, loc [$3, $5]) }
+      | ident Formals               { (ident $1, $2) }
 
-Id :: { Id }
-Id : ident { $1 }
-   | monop { $1 }
-   | binop { $1 }
+Id :: { Located Id }
+Id : ident { ident $1 }
+   | monop { ident $1 }
+   | binop { ident $1 }
 
 -- Expressions
-Expr ::                      { Sugar }
+Expr ::                      { Located Sugar }
 Expr : Cond                  { $1 }
      | let Decl in Expr      { declToLet $2 $4 }
-     | function Formals Expr { FnS [FnArm "" $2 $3 Nothing] }
-     | Cond '>>' Expr        { SeqS $1 $3 }
+     | function Formals Expr { $1 *> (FnS <@> loc [FnArm "" <@> $2 <*> $3 <*> pure Nothing]) }
+     | Cond '>>' Expr        { SeqS <@> $1 <*> $3 }
 
-ExprOrSect ::                      { Sugar }
+ExprOrSect ::                      { Located Sugar }
 ExprOrSect : let Decl in Expr      { declToLet $2 $4 }
-           | function Formals Expr { FnS [FnArm "" $2 $3 Nothing] }
+           | function Formals Expr { $1 *> (FnS <@> loc [FnArm "" <@> $2 <*> $3 <*> pure Nothing]) }
            | CondOrSect            { $1 }
-           | Cond '>>' Expr        { SeqS $1 $3 }
+           | Cond '>>' Expr        { SeqS <@> $1 <*> $3 }
 
-Cond ::                            { Sugar }
+Cond ::                            { Located Sugar }
 Cond : Term                        { $1 }
-     | if Cond then Cond else Cond { IfS $2 $4 $6 }
+     | if Cond then Cond else Cond { IfS <@> $2 <*> $4 <*> $6 }
 
-CondOrSect ::                            { Sugar }
+CondOrSect ::                            { Located Sugar }
 CondOrSect : TermOrSect                  { $1 }
-           | if Cond then Cond else Cond { IfS $2 $4 $6 }
+           | if Cond then Cond else Cond { IfS <@> $2 <*> $4 <*> $6 }
 
-Term ::       { Sugar }
+Term ::       { Located Sugar }
 Term : Factor { $1 }
      | OpTree { mkOpExpr $1 }
 
-TermOrSect ::             { Sugar }
+TermOrSect ::             { Located Sugar }
 TermOrSect : Factor       { $1 }
-           | Factor BinOp { LSectS $1 $2 }
+           | Factor BinOp { LSectS <@> $1 <*> $2 }
            | OpTree       { mkOpExpr $1 }
-           | OpTree BinOp { LSectS (mkOpExpr $1) $2 }
+           | OpTree BinOp { LSectS <@> (mkOpExpr $1) <*> $2 }
 
-OpTree ::                    { OpTree Sugar }
-OpTree : Factor BinOp Factor { Op $2 (Leaf $1) (Leaf $3) }
-       | OpTree BinOp Factor { fixPrec $ Op $2 $1 (Leaf $3) }
+OpTree ::                    { OpTree (Located Sugar) }
+OpTree : Factor BinOp Factor { Op (dislocate $2) (Leaf $1) (Leaf $3) }
+       | OpTree BinOp Factor { fixPrec $ Op (dislocate $2) $1 (Leaf $3) }
 
-BinOp ::             { Id }
+BinOp ::             { Located Id }
 BinOp : BinOpNoMinus { $1 }
-      | '-'          { "-" }
+      | '-'          { ident $1 }
 
-BinOpNoMinus ::      { Id }
-BinOpNoMinus : '+'   { "+" }
-             | ':'   { ":" }
-             | '='   { "=" }
-             | binop { $1 }
+BinOpNoMinus ::      { Located Id }
+BinOpNoMinus : '+'   { ident $1 }
+             | ':'   { ident $1 }
+             | '='   { ident $1 }
+             | binop { ident $1 }
 
-Factor ::             { Sugar }
+Factor ::             { Located Sugar }
 Factor : Primary      { $1 }
-       | monop Factor { AppS $1 [$2] }
-       | '-' Factor   { AppS "~" [$2] }
+       | monop Factor { AppS <@> (ident $1) <*> (loc [$2]) }
+       | '-' Factor   { AppS <@> ($1 *> pure "~") <*> (loc [$2]) }
 
-Primary ::                          { Sugar }
-Primary : num                       { numB $1 }
-        | atom                      { atomB $1 }
-        | str                       { strB $1 }
-        | ident                     { VarS $1 }
-        | ident '(' Actuals ')'     { AppS $1 (reverse $3) }
-        | '[' ListExpr ']'          { $2 }
-        | '(' monop ')'             { VarS $2 }
-        | '(' BinOp ')'             { VarS $2 }
-        | '(' BinOpNoMinus Term ')' { RSectS $2 $3 }
-        | '(' ExprOrSect ')'        { $2 }
+Primary ::                          { Located Sugar }
+Primary : num                       { val $1 }
+        | atom                      { val $1 }
+        | str                       { val $1 }
+        | ident                     { val $1 }
+        | ident '(' Actuals ')'     { AppS <@> ident $1 <*> ($2 *> loc (reverse $3) <* $4) }
+        | '[' ListExpr ']'          { $1 *> $2 <* $3 }
+        | '(' monop ')'             { $1 *> val $2 <* $3 }
+        | '(' BinOp ')'             { $1 *> (VarS <@> $2) <* $3 }
+        | '(' BinOpNoMinus Term ')' { $1 *> RSectS <@> $2 <*> $3 <* $4 }
+        | '(' ExprOrSect ')'        { $1 *> $2 <* $3 }
 
-Actuals ::                 { [Sugar] }
+Actuals ::                 { [Located Sugar] }
 Actuals : {- empty -}      { [] }
         | Expr             { [$1] }
         | Actuals ',' Expr { $3 : $1 }
 
-ListExpr ::               { Sugar }
-ListExpr : Actuals        { enlist $1 }
-         | Expr '..' Expr { RangeS $1 $3 }
-         | Expr '|' Gens  { ListCompS $1 (reverse $3) }
+ListExpr ::               { Located Sugar }
+ListExpr : Actuals        { enlist <@> loc $1 }
+         | Expr '..' Expr { RangeS <@> $1 <*> $3 }
+         | Expr '|' Gens  { ListCompS <@> $1 <*> loc (reverse $3) }
 
-Gens ::                        { [Gen] }
-Gens : Patt '<-' Expr          { [GenB $1 $3] }
-     | Gens ',' Patt '<-' Expr { GenB $3 $5 : $1 }
-     | Gens when Expr          { FilterB $3 : $1 }
+Gens ::                        { [Located Gen] }
+Gens : Patt '<-' Expr          { [GenB <@> $1 <*> $3] }
+     | Gens ',' Patt '<-' Expr { (GenB <@> $3 <*> $5) : $1 }
+     | Gens when Expr          { (FilterB <@> $3) : $1 }
 
 -- Pattern DSL
-Formals ::              { [Patt] }
-Formals : '(' Patts ')' { reverse $2 }
+Formals ::              { Located [Patt] }
+Formals : '(' Patts ')' { $1 *> loc (reverse $2) <* $3 }
 
-Patts ::               { [Patt] }
+Patts ::               { [Located Patt] }
 Patts : {- empty -}    { [] }
       | Patt           { [$1] }
       | Patts ',' Patt { $3 : $1 }
 
-Patt ::                          { Patt }
+Patt ::                          { Located Patt }
 Patt : PattPrim                  { $1 }
-     | PattPrimCons ':' PattPrim { enlist1 ($3 : $1) }
+     | PattPrimCons ':' PattPrim { enlist1 <@> loc ($3 : $1) }
 
-PattPrimCons ::                          { [Patt] }
+PattPrimCons ::                          { [Located Patt] }
 PattPrimCons : PattPrim                  { [$1] }
              | PattPrimCons ':' PattPrim { $3 : $1 }
 
-PattPrim ::                 { Patt }
-PattPrim : ident            { VarP $1 }
-         | atom             { atomB $1 }
-         | '_'              { VarP "_" }
-         | num              { numB $1 }
-         | str              { strB $1 }
-         | '(' Patt ')'     { $2 }
-         | '[' ListPatt ']' { enlist $2 }
+PattPrim ::                 { Located Patt }
+PattPrim : ident            { pat $1 }
+         | atom             { pat $1 }
+         | num              { pat $1 }
+         | str              { pat $1 }
+         | '_'              { $1 *> pure (VarP "_") }
+         | '(' Patt ')'     { $1 *> $2 <* $3 }
+         | '[' ListPatt ']' { $1 *> (enlist <@> loc $2) <* $3 }
 
-ListPatt ::                  { [Patt] }
+ListPatt ::                  { [Located Patt] }
 ListPatt : {- empty -}       { [] }
          | Patt              { [$1] }
          | ListPatt ',' Patt { $3 : $1 }
 
 {
+
+(<@>) :: Functor f => (a -> b) -> f a -> f b
+(<@>) = (<$>)
+
+-- Source Mapping
+val :: Lexeme -> Located Sugar
+val = fmap trn
+  where
+    trn (Num n)   = numB n
+    trn (Str s)   = strB s
+    trn (Atom a)  = atomB a
+    trn (Ident v) = VarS v
+    trn (BinOp b) = VarS b
+    trn (MonOp m) = VarS m
+    trn _         = error "val: Not a value"
+
+pat :: Lexeme -> Located Patt
+pat = fmap trn
+  where
+    trn (Num n)   = numB n
+    trn (Str s)   = strB s
+    trn (Atom a)  = atomB a
+    trn (Ident v) = VarP v
+    trn (BinOp b) = VarP b
+    trn (MonOp m) = VarP m
+    trn _         = error "pat: Not a base pattern"
+
+ident :: Lexeme -> Located Id
+ident = fmap trn
+  where
+    trn (Ident v) = v
+    trn (BinOp b) = b
+    trn (MonOp m) = m
+    trn _         = error "ident: Not an identifier"
+
 -- TODO: Errors should contain positions (line + column)
 
 -- Function Declarations
-mkFnArm = uncurry FnArm
+mkFnArm :: (Located Id, Located [Patt])
+        -- ^ Function Interface
+        -> Located Sugar
+        -- ^ Function Body
+        -> Located (Maybe Sugar)
+        -- ^ Optional guard condition
+        -> Located FnArm
 
-fnToDecl :: [FnArm] -> Alex Decl
+mkFnArm (li, lps) lb lg = FnArm <@> li <*> lps <*> lb <*> lg
+
+fnToDecl :: [Located FnArm] -> Alex (Located Decl)
 fnToDecl body@(a:as)
   | any (name a /=) (map name as)   = alexError "Parse Error, all function names need to match."
   | any (arity a /=) (map arity as) = alexError "Parse Error, all arities must match."
-  | otherwise                       = return (Decl (name a) (FnS body))
+  | otherwise                       = return (Decl (name a) <@> (FnS <@> loc body))
   where
-    name  (FnArm id _ _ _) = id
-    arity (FnArm _ fs _ _) = length fs
+    name  lfa | (FnArm id _ _ _) <- dislocate lfa = id
+    arity lfa | (FnArm _ fs _ _) <- dislocate lfa = length fs
 
 fnToDecl [] = error "fnToDecl: Empty function definition."
 
 -- Operator Associativity Parsing
-mkOpExpr :: OpTree Sugar -> Sugar
+mkOpExpr :: OpTree (Located Sugar) -> Located Sugar
 mkOpExpr (Leaf e)   = e
-mkOpExpr (Op i l r) = AppS i [mkOpExpr l, mkOpExpr r]
+mkOpExpr (Op i l r) = AppS i <@> loc [mkOpExpr l, mkOpExpr r]
 
 parseError :: Lexeme -> Alex a
 parseError l = alexError msg

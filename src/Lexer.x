@@ -3,7 +3,9 @@
 
 module Lexer ( Alex
              , alexError
+             , alexMonadScan
              , getToken
+             , runAlex
              ) where
 
 import Data.Char (chr)

@@ -2,7 +2,6 @@
 module Location where
 
 import Data.Monoid ((<>))
-import Data.Traversable (sequenceA)
 
 -- | An annotation linking the (parameterised) data to a specific location in
 -- the source.
