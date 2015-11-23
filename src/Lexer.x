@@ -1,7 +1,10 @@
 {
 {-# OPTIONS_GHC -w #-}
 
-module Lexer where
+module Lexer ( Alex
+             , alexError
+             , getToken
+             ) where
 
 import Data.Char (chr)
 import Location
@@ -95,7 +98,7 @@ skipComment _ _ = alexGetInput >>= go 1
     fromByte     = chr . fromIntegral
 
 alexEOF :: Alex Lexeme
-alexEOF = return (L emptySpan Eof)
+alexEOF = return (L Floating Eof)
 
 scanError :: String -> AlexAction a
 scanError msg (pos, _, _, str) _ =
