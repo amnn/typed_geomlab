@@ -22,8 +22,8 @@ data PattB a = ValPB (LitB a)
                deriving ( Eq
                         , Ord
                         , Show
-                        , P.Foldable
                         , Functor
+                        , P.Foldable
                         , Traversable
                         )
 
@@ -34,7 +34,12 @@ data GenB a = GenB Patt a
             | FilterB a
               -- ^ A generator that filters previous values. @ FilterB e @
               -- corresponds to @ ..., when e, ... @ in the source.
-              deriving (Eq, Show, Functor)
+              deriving ( Eq
+                       , Show
+                       , Functor
+                       , P.Foldable
+                       , Traversable
+                       )
 
 -- | A single arm of a function definition in the source AST, storing the name
 -- of the function, the fully nested pattern to match against, the function body
@@ -58,7 +63,6 @@ instance Foldable Patt where
 
 instance EmbedsLit Patt where
   embedLit = ValP
-
 
 isVar :: PattB a -> Bool
 isVar (VarPB _) = True

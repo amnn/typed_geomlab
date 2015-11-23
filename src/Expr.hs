@@ -6,6 +6,7 @@ import Prelude hiding (Foldable)
 import qualified Prelude as P (Foldable)
 import Data.Functor.Foldable
 import Literal
+import Location
 import Patt
 import Token (Id)
 
@@ -33,6 +34,7 @@ data Expr = LitE (LitB Expr)
           | AppE Expr [Expr]
           | LetE Expr Expr
           | SeqE Expr Expr
+          | LocE (Located Expr)
 
           -- Case Expression Specific
           | FailE
@@ -49,6 +51,7 @@ data ExprB a = LitEB (LitB a)
              | AppEB a [a]
              | LetEB a a
              | SeqEB a a
+             | LocEB (Located a)
              | FailEB
              | FallThroughEB
                deriving ( Eq, Show
@@ -70,6 +73,7 @@ instance Foldable Expr where
   project (AppE f xs)  = AppEB f xs
   project (LetE a b)   = LetEB a b
   project (SeqE a b)   = SeqEB a b
+  project (LocE le)    = LocEB le
   project FailE        = FailEB
   project FallThroughE = FallThroughEB
 
@@ -83,5 +87,6 @@ instance Unfoldable Expr where
   embed (AppEB f xs)  = AppE f xs
   embed (LetEB a b)   = LetE a b
   embed (SeqEB a b)   = SeqE a b
+  embed (LocEB le)    = LocE le
   embed FailEB        = FailE
   embed FallThroughEB = FallThroughE
