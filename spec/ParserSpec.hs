@@ -231,6 +231,17 @@ spec = do
     , Eval (LSectS (atomB "foo") ":")
     ]
 
+  locParseFile "test/src_map_section.geom" $
+    [ Eval (annL LocS (S (P 1 1) 0 5)   (RSectS ":" (annL LocS (S (P 1 3) 2 2) nilB)))
+
+    , Eval (annL LocS (S (P 1 8) 7 8)   (RSectS ":" (annL LocS (S (P 1 10) 9 5)
+                                                       (consB (strB "a") nilB))))
+
+    , Eval (annL LocS (S (P 1 18) 17 4) (LSectS (annL LocS (S (P 1 19) 18 1) (numB 1)) ":"))
+
+    , Eval (annL LocS (S (P 1 24) 23 7) (LSectS (annL LocS (S (P 1 25) 24 4) (atomB "foo")) ":"))
+    ]
+
   parseFile "test/gen_sym.geom" $
     [ Def "labcount" (AppS "_new" [numB 0])
     , Def "label"    (FnS [ FnArm "label" []

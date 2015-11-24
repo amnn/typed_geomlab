@@ -108,7 +108,7 @@ Term : Factor { $1 }
 
 TermOrSect ::             { Located Sugar }
 TermOrSect : Factor       { $1 }
-           | Factor BinOp { LSectS <@> $1 <*> $2 }
+           | Factor BinOp { LSectS <@> reify $1 <*> $2 }
            | OpTree       { mkOpExpr $1 }
            | OpTree BinOp { LSectS <@> (mkOpExpr $1) <*> $2 }
 
@@ -140,7 +140,7 @@ Primary : num                       { val $1 }
         | '[' ListExpr ']'          { $1 *> $2 <* $3 }
         | '(' monop ')'             { $1 *> val $2 <* $3 }
         | '(' BinOp ')'             { $1 *> (VarS <@> $2) <* $3 }
-        | '(' BinOpNoMinus Term ')' { $1 *> RSectS <@> $2 <*> $3 <* $4 }
+        | '(' BinOpNoMinus Term ')' { $1 *> RSectS <@> $2 <*> reify $3 <* $4 }
         | '(' ExprOrSect ')'        { $1 *> $2 <* $3 }
 
 Actuals ::                 { [Located Sugar] }
