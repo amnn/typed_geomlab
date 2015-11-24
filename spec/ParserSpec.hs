@@ -131,6 +131,34 @@ spec = do
               ])
     ]
 
+  locParseFile "test/src_map_list_comp.geom" $
+    [ Eval (annL LocS (S (P 1 1) 0 18)
+              (ListCompS (annL LocS (S (P 1 3) 2 1) (VarS "x"))
+                 [ GenB (VarP "x")
+                        (annL LocS (S (P 1 12) 11 6)
+                           (RangeS (annL LocS (S (P 1 13) 12 1) (VarS "a"))
+                                   (annL LocS (S (P 1 16) 15 1) (VarS "b"))))
+                 ]))
+
+    , Eval (annL LocS (S (P 2 1) 20 26)
+              (ListCompS (annL LocS (S (P 2 3) 22 1) (VarS "x"))
+                [ GenB (enlist [VarP "_", VarP "x"])
+                       (annL LocS (S (P 2 17) 36 2) (VarS "xs"))
+                , FilterB (annL LocS (S (P 2 25) 44 1) (VarS "y"))
+                ]))
+
+    , Eval (annL LocS (S (P 3 1) 48 33)
+              (ListCompS (annL LocS (S (P 3 3) 50 6)
+                            (enlist [ annL LocS (S (P 3 7) 54 1) (VarS "y")
+                                    , annL LocS (S (P 3 4) 51 1) (VarS "x")
+                                    ]))
+                [ GenB (enlist [VarP "_", VarP "x"])
+                       (annL LocS (S (P 3 22) 69 2) (VarS "xs"))
+                , GenB (VarP "y")
+                       (annL LocS (S (P 3 31) 78 2) (VarS "ys"))
+                ]))
+    ]
+
   locParseFile "test/empty.geom" $
     [ Def "foo" (FnS [ FnArm "foo" []
                          (annL LocS (S (P 1 16) 15 1) (numB 1.0))
@@ -235,7 +263,9 @@ spec = do
     [ Eval (annL LocS (S (P 1 1) 0 5)   (RSectS ":" (annL LocS (S (P 1 3) 2 2) nilB)))
 
     , Eval (annL LocS (S (P 1 8) 7 8)   (RSectS ":" (annL LocS (S (P 1 10) 9 5)
-                                                       (consB (strB "a") nilB))))
+                                                       (consB (annL LocS (S (P 1 11) 10 3)
+                                                                 (strB "a"))
+                                                              nilB))))
 
     , Eval (annL LocS (S (P 1 18) 17 4) (LSectS (annL LocS (S (P 1 19) 18 1) (numB 1)) ":"))
 

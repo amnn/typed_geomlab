@@ -149,14 +149,14 @@ Actuals : {- empty -}      { [] }
         | Actuals ',' Expr { $3 : $1 }
 
 ListExpr ::               { Located Sugar }
-ListExpr : Actuals        { enlist <@> loc $1 }
-         | Expr '..' Expr { RangeS <@> $1 <*> $3 }
-         | Expr '|' Gens  { ListCompS <@> $1 <*> loc (reverse $3) }
+ListExpr : Actuals        { enlist <@> loc (reify <@> $1) }
+         | Expr '..' Expr { RangeS <@> reify $1 <*> reify $3 }
+         | Expr '|' Gens  { ListCompS <@> reify $1 <*> loc (reverse $3) }
 
 Gens ::                        { [Located Gen] }
-Gens : Patt '<-' Expr          { [GenB <@> $1 <*> $3] }
-     | Gens ',' Patt '<-' Expr { (GenB <@> $3 <*> $5) : $1 }
-     | Gens when Expr          { (FilterB <@> $3) : $1 }
+Gens : Patt '<-' Expr          { [GenB <@> $1 <*> reify $3] }
+     | Gens ',' Patt '<-' Expr { (GenB <@> $3 <*> reify $5) : $1 }
+     | Gens when Expr          { (FilterB <@> reify $3) : $1 }
 
 -- Pattern DSL
 Formals ::              { Located [Patt] }
@@ -200,7 +200,7 @@ reify :: Located Sugar -> Located Sugar
 reify ls@(L s _) = L s (LocS ls)
 
 apply :: Located Id -> [Located Sugar] -> Located Sugar
-apply x xs = AppS <@> x <*> loc (reify <$> xs)
+apply x xs = AppS <@> x <*> loc (reify <@> xs)
 
 val :: Lexeme -> Located Sugar
 val = fmap trn
