@@ -1,6 +1,7 @@
 module ParserSpec where
 
 import Literal
+import Location
 import Patt
 import SpecHelper
 import Sugar
@@ -42,34 +43,54 @@ spec = do
     , Eval (AppS "mod" [VarS "a", VarS "b"])
     ]
 
-  parseFile "test/monop_fn.geom" $
-    [ Eval (AppS "~" [numB 10.0])
-    , Eval (LitS (NumB (-10.0)))
-    , Eval (AppS "~" [numB (-10)])
+  locParseFile "test/monop_fn.geom" $
+    [ Eval (annL LocS (S (P 1 1)  0 5)  (AppS "~" [(annL LocS (S (P 1 2) 1 4) (numB 10.0))]))
+    , Eval (annL LocS (S (P 1 8)  7 3)  (LitS (NumB (-10.0))))
+    , Eval (annL LocS (S (P 1 13) 12 6) (AppS "~" [(annL LocS (S (P 1 14) 13 5) (numB (-10)))]))
     ]
 
-  parseFile "test/neg.geom" $
-    [ Def "x" (numB 1)
-    , Eval (AppS "~" [AppS "~" [numB 10.0]])
-    , Eval (AppS "+" [ numB 1
-                     , AppS "~" [ AppS "+" [ VarS "x"
-                                           , numB 1.0
-                                           ]
-                                ]
-                     ])
-    , Eval (AppS "+" [ AppS "+" [ numB 1.0
-                                , AppS "~" [VarS "x"]
-                                ]
-                     , numB 1.0
-                     ])
+  locParseFile "test/neg.geom" $
+    [ Def "x" (annL LocS (S (P 1 12) 11 1) (numB 1))
+
+    , Eval (annL LocS (S (P 3 1) 15 6)
+              (AppS "~" [annL LocS (S (P 3 3) 17 4)
+                           (AppS "~" [annL LocS (S (P 3 5) 19 2) $ numB 10.0])]))
+
+    , Eval
+        (annL LocS (S (P 3 9) 23 13)
+           (AppS "+" [ annL LocS (S (P 3 9) 23 1) (numB 1)
+                     , annL LocS (S (P 3 13) 27 9)
+                         (AppS "~" [ annL LocS (S (P 3 15) 29 7)
+                                       (AppS "+" [ annL LocS (S (P 3 16) 30 1) (VarS "x")
+                                                 , annL LocS (S (P 3 20) 34 1) (numB 1.0)
+                                                 ])
+                                   ])
+                     ]))
+
+    , Eval
+        (annL LocS (S (P 3 24) 38 10)
+           (AppS "+" [ annL LocS (S (P 3 24) 38 6)
+                         (AppS "+" [ annL LocS (S (P 3 24) 38 1) (numB 1.0)
+                                   , annL LocS (S (P 3 28) 42 2)
+                                       (AppS "~" [annL LocS (S (P 3 29) 43 1) (VarS "x")])
+                                   ])
+                     , annL LocS (S (P 3 33) 47 1) (numB 1.0)
+                     ]))
     ]
 
-  parseFile "test/not.geom" $
-    [ Def "not" (FnS [ FnArm "not" [VarP "p"] (VarS "false") (Just (VarS "p"))
-                     , FnArm "not" [VarP "_"] (VarS "true")  Nothing
+  locParseFile "test/not.geom" $
+    [ Def "not" (FnS [ FnArm "not" [VarP "p"]
+                         (annL LocS (S (P 1 17) 16 5) (VarS "false"))
+                         (Just (annL LocS (S (P 1 28) 27 1) (VarS "p")))
+                     , FnArm "not" [VarP "_"]
+                         (annL LocS (S (P 2 17) 45 4) (VarS "true"))
+                         Nothing
                      ])
-    , Eval (AppS "not" [VarS "true"])
-    , Eval (AppS "not" [VarS "false"])
+    , Eval (annL LocS (S (P 4 1) 52 8)
+              (AppS "not" [annL LocS (S (P 4 5) 56 4) (VarS "true")]))
+
+    , Eval (annL LocS (S (P 5 1) 62 9)
+              (AppS "not" [annL LocS (S (P 5 5) 66 5) (VarS "false")]))
     ]
 
   parseFile "test/list_comp.geom" $
@@ -110,9 +131,13 @@ spec = do
               ])
     ]
 
-  parseFile "test/empty.geom" $
-    [ Def "foo" (FnS [ FnArm "foo" [] (numB 1.0) (Just (VarS "true"))
-                     , FnArm "foo" [] (numB 2.0) Nothing
+  locParseFile "test/empty.geom" $
+    [ Def "foo" (FnS [ FnArm "foo" []
+                         (annL LocS (S (P 1 16) 15 1) (numB 1.0))
+                         (Just (annL LocS (S (P 1 23) 22 4) (VarS "true")))
+                     , FnArm "foo" []
+                         (annL LocS (S (P 2 16) 42 1) (numB 2.0))
+                         Nothing
                      ])
     ]
 

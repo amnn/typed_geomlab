@@ -57,7 +57,7 @@ Paras : Para        { [$1] }
 
 Para ::                { Para Sugar }
 Para : define Decl ';' { declToDef $2 }
-     | Expr ';'        { Eval (dislocate $1) }
+     | Expr ';'        { Eval . dislocate . reify $ $1 }
 
 Decl ::            { Located Decl }
 Decl : Id '=' Expr { Decl <@> $1 <*> reify $3 }
@@ -264,5 +264,5 @@ mkOpExpr (Op i l r) = apply (pure i) [mkOpExpr l, mkOpExpr r]
 parseError :: Lexeme -> Alex a
 parseError l = alexError msg
   where
-    msg = concat ["Parse Error, near ", show l]
+    msg = concat ["Parse Error, near ", fmtErr l]
 }

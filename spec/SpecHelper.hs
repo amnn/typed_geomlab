@@ -8,6 +8,7 @@ module SpecHelper
        , desugarFile
        , locDesugarFile
        , typeCheckFile
+       , annL
        ) where
 
 import Prelude hiding (Foldable)
@@ -55,6 +56,9 @@ typeCheckFile = testFile "type checks" paraEq tc
     eitherEq (Right u) (Right v) = alphaEq u v
     eitherEq (Left  e) (Left  f) = e == f
     eitherEq _         _         = False
+
+annL :: (Located a -> b) -> Span -> a -> b
+annL f s = f . L s
 
 type Result a = IO (Either String a)
 

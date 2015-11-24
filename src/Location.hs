@@ -7,6 +7,7 @@ import Data.Monoid ((<>))
 -- the source.
 data Located a = L Span a
                  deriving ( Eq
+                          , Show
                           , Foldable
                           , Functor
                           , Traversable
@@ -27,14 +28,14 @@ data Span      = S { start  :: !Point
                | Floating
                  deriving (Eq, Show)
 
-instance Show a => Show (Located a) where
-  show (L (S (P l c) _ _) a) =
-    concat [ show a
-           , " at line ", show l
-           , ", column ", show c
-           ]
+fmtErr :: Show a => Located a -> String
+fmtErr (L (S (P l c) _ _) x) =
+  concat [ show x
+         , " at line ", show l
+         , ", column ", show c
+         ]
 
-  show (L Floating a) = show a
+fmtErr (L Floating x) = show x
 
 instance Monoid Span where
   mempty = Floating
