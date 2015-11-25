@@ -25,6 +25,7 @@ import Patt
 import Structure (shapeEq)
 import Sugar
 import Token (Id)
+import TyError
 import Type
 
 type GSRef  s = STRef s (GlobalState s)
@@ -61,19 +62,6 @@ data StratTy s = StratTy { ty       :: TyB (StratV s) (TyRef s)
                          , newLevel :: Maybe Level
                          , oldLevel :: !Level
                          } deriving Eq
-
--- | Possible Type Errors that the checker may emit
-data TyError = UnboundVarE Id
-            -- ^ A free variable was found for which no type exists
-            -- (i.e. undefined variable).
-             | UnificationE
-            -- ^ Could not unify two types.
-             | OccursE
-            -- ^ When unifying a variable with a type, we found the variable
-            -- within the type (A cycle was detected in the occurs check).
-             | CtxE (Located TyError)
-            -- ^ Adds context to an error in the form of a location.
-               deriving (Eq, Show)
 
 -- | Constraint of all the Monads used by the type checker.
 type MonadInfer m = ( MonadST m
@@ -440,9 +428,9 @@ typeOf gloDefs = check
 
     check (SeqE a b) = check a >> check b
 
-    check (LocE le) =
+    check (LocE lbl le) =
       catchError (check (dislocate le)) $ \e -> do
-        throwError $ CtxE (le *> pure e)
+        throwError $ CtxE lbl (le *> pure e)
 
     check _ = newVar
 

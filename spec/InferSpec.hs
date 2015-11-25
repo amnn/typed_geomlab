@@ -1,9 +1,9 @@
 module InferSpec where
 
 import SpecHelper
-import Infer
 import Sugar
 import Token
+import TyError
 import Type
 
 def :: Id -> Ty Id -> Para (Either TyError (Ty Id))

@@ -34,7 +34,7 @@ data Expr = LitE (LitB Expr)
           | AppE Expr [Expr]
           | LetE Expr Expr
           | SeqE Expr Expr
-          | LocE (Located Expr)
+          | LocE String (Located Expr)
 
           -- Case Expression Specific
           | FailE
@@ -51,7 +51,7 @@ data ExprB a = LitEB (LitB a)
              | AppEB a [a]
              | LetEB a a
              | SeqEB a a
-             | LocEB (Located a)
+             | LocEB String (Located a)
              | FailEB
              | FallThroughEB
                deriving ( Eq, Show
@@ -64,29 +64,29 @@ instance EmbedsLit Expr where
 
 type instance Base Expr = ExprB
 instance Foldable Expr where
-  project (LitE s)     = LitEB s
-  project (VarE x)     = VarEB x
-  project (FreeE x)    = FreeEB x
-  project (IfE c t e)  = IfEB c t e
-  project (CaseE e as) = CaseEB e as
-  project (FnE n e)    = FnEB n e
-  project (AppE f xs)  = AppEB f xs
-  project (LetE a b)   = LetEB a b
-  project (SeqE a b)   = SeqEB a b
-  project (LocE le)    = LocEB le
-  project FailE        = FailEB
-  project FallThroughE = FallThroughEB
+  project (LitE s)      = LitEB s
+  project (VarE x)      = VarEB x
+  project (FreeE x)     = FreeEB x
+  project (IfE c t e)   = IfEB c t e
+  project (CaseE e as)  = CaseEB e as
+  project (FnE n e)     = FnEB n e
+  project (AppE f xs)   = AppEB f xs
+  project (LetE a b)    = LetEB a b
+  project (SeqE a b)    = SeqEB a b
+  project (LocE lbl le) = LocEB lbl le
+  project FailE         = FailEB
+  project FallThroughE  = FallThroughEB
 
 instance Unfoldable Expr where
-  embed (LitEB s)     = LitE s
-  embed (VarEB x)     = VarE x
-  embed (FreeEB x)    = FreeE x
-  embed (IfEB c t e)  = IfE c t e
-  embed (CaseEB e as) = CaseE e as
-  embed (FnEB n e)    = FnE n e
-  embed (AppEB f xs)  = AppE f xs
-  embed (LetEB a b)   = LetE a b
-  embed (SeqEB a b)   = SeqE a b
-  embed (LocEB le)    = LocE le
-  embed FailEB        = FailE
-  embed FallThroughEB = FallThroughE
+  embed (LitEB s)      = LitE s
+  embed (VarEB x)      = VarE x
+  embed (FreeEB x)     = FreeE x
+  embed (IfEB c t e)   = IfE c t e
+  embed (CaseEB e as)  = CaseE e as
+  embed (FnEB n e)     = FnE n e
+  embed (AppEB f xs)   = AppE f xs
+  embed (LetEB a b)    = LetE a b
+  embed (SeqEB a b)    = SeqE a b
+  embed (LocEB lbl le) = LocE lbl le
+  embed FailEB         = FailE
+  embed FallThroughEB  = FallThroughE

@@ -58,10 +58,10 @@ Paras : Para        { [$1] }
 
 Para ::                { Para Sugar }
 Para : define Decl ';' { declToDef $2 }
-     | Expr ';'        { Eval . dislocate . reify $ $1 }
+     | Expr ';'        { Eval . dislocate . reify "expression" $ $1 }
 
 Decl ::            { Located Decl }
-Decl : Id '=' Expr { Decl <@> $1 <*> reify $3 }
+Decl : Id '=' Expr { Decl <@> $1 <*> reify ("definition of \'" ++ dislocate $1 ++ "\'") $3 }
      | FnBody      {% fnToDecl $ (reverse $1) }
 
 FnBody ::                 { [Located FnArm] }
@@ -69,8 +69,8 @@ FnBody : FnArm            { [$1] }
        | FnBody '|' FnArm { $3 : $1 }
 
 FnArm ::                         { Located FnArm }
-FnArm : FnLhs '=' Expr           { mkFnArm $1 (reify $3) (pure Nothing) }
-      | FnLhs '=' Expr when Expr { mkFnArm $1 (reify $3) (Just <@> (reify $5)) }
+FnArm : FnLhs '=' Expr           { mkFnArm $1 $3 (pure Nothing) }
+      | FnLhs '=' Expr when Expr { mkFnArm $1 $3 (Just <@> (reify "guard" $5)) }
 
 FnLhs ::                            { (Located Id, Located [Patt]) }
 FnLhs : monop '(' Patt ')'          { (ident $1, loc [$3]) }
@@ -85,23 +85,23 @@ Id : ident { ident $1 }
 -- Expressions
 Expr ::                      { Located Sugar }
 Expr : Cond                  { $1 }
-     | let Decl in Expr      { declToLet $2 (reify $4) }
-     | function Formals Expr { $1 *> (FnS <@> loc [FnArm "" <@> $2 <*> reify $3 <*> pure Nothing]) }
+     | let Decl in Expr      { declToLet $2 (reify "let body" $4) }
+     | function Formals Expr { $1 *> anonFn $2 $3 }
      | Cond '>>' Expr        { SeqS <@> $1 <*> $3 }
 
 ExprOrSect ::                      { Located Sugar }
-ExprOrSect : let Decl in Expr      { declToLet $2 (reify $4) }
-           | function Formals Expr { $1 *> (FnS <@> loc [FnArm "" <@> $2 <*> reify $3 <*> pure Nothing]) }
+ExprOrSect : let Decl in Expr      { declToLet $2 (reify "let body" $4) }
+           | function Formals Expr { $1 *> anonFn $2 $3 }
            | CondOrSect            { $1 }
-           | Cond '>>' Expr        { SeqS <@> reify $1 <*> reify $3 }
+           | Cond '>>' Expr        { SeqS <@> $1 <*> $3 }
 
 Cond ::                            { Located Sugar }
 Cond : Term                        { $1 }
-     | if Cond then Cond else Cond { IfS <@> reify $2 <*> reify $4 <*> reify $6 }
+     | if Cond then Cond else Cond { $1 *> reifyIf $2 $4 $6 }
 
 CondOrSect ::                            { Located Sugar }
 CondOrSect : TermOrSect                  { $1 }
-           | if Cond then Cond else Cond { IfS <@> reify $2 <*> reify $4 <*> reify $6 }
+           | if Cond then Cond else Cond { $1 *> reifyIf $2 $4 $6 }
 
 Term ::       { Located Sugar }
 Term : Factor { $1 }
@@ -109,9 +109,9 @@ Term : Factor { $1 }
 
 TermOrSect ::             { Located Sugar }
 TermOrSect : Factor       { $1 }
-           | Factor BinOp { LSectS <@> reify $1 <*> $2 }
+           | Factor BinOp { LSectS <@> reify "left section" $1 <*> $2 }
            | OpTree       { mkOpExpr $1 }
-           | OpTree BinOp { LSectS <@> (mkOpExpr $1) <*> $2 }
+           | OpTree BinOp { LSectS <@> reify "left section" (mkOpExpr $1) <*> $2 }
 
 OpTree ::                    { OpTree (Located Sugar) }
 OpTree : Factor BinOp Factor { Op (dislocate $2) (Leaf $1) (Leaf $3) }
@@ -141,7 +141,7 @@ Primary : num                       { val $1 }
         | '[' ListExpr ']'          { $1 *> $2 <* $3 }
         | '(' monop ')'             { $1 *> val $2 <* $3 }
         | '(' BinOp ')'             { $1 *> (VarS <@> $2) <* $3 }
-        | '(' BinOpNoMinus Term ')' { $1 *> RSectS <@> $2 <*> reify $3 <* $4 }
+        | '(' BinOpNoMinus Term ')' { $1 *> RSectS <@> $2 <*> reify "right section" $3 <* $4 }
         | '(' ExprOrSect ')'        { $1 *> $2 <* $3 }
 
 Actuals ::                 { [Located Sugar] }
@@ -150,14 +150,14 @@ Actuals : {- empty -}      { [] }
         | Actuals ',' Expr { $3 : $1 }
 
 ListExpr ::               { Located Sugar }
-ListExpr : Actuals        { enlist <@> loc (reify <@> $1) }
-         | Expr '..' Expr { RangeS <@> reify $1 <*> reify $3 }
-         | Expr '|' Gens  { ListCompS <@> reify $1 <*> loc (reverse $3) }
+ListExpr : Actuals        { reifyList $1 }
+         | Expr '..' Expr { RangeS <@> reify "lowerbound" $1 <*> reify "upperbound" $3 }
+         | Expr '|' Gens  { ListCompS <@> reify "yield" $1 <*> loc (reverse $3) }
 
 Gens ::                        { [Located Gen] }
-Gens : Patt '<-' Expr          { [GenB <@> $1 <*> reify $3] }
-     | Gens ',' Patt '<-' Expr { (GenB <@> $3 <*> reify $5) : $1 }
-     | Gens when Expr          { (FilterB <@> reify $3) : $1 }
+Gens : Patt '<-' Expr          { [GenB <@> $1 <*> reify "generator" $3] }
+     | Gens ',' Patt '<-' Expr { (GenB <@> $3 <*> reify "generator" $5) : $1 }
+     | Gens when Expr          { (FilterB <@> reify "guard" $3) : $1 }
 
 -- Pattern DSL
 Formals ::              { Located [Patt] }
@@ -197,12 +197,44 @@ ListPatt : {- empty -}       { [] }
 (<@>) = (<$>)
 
 -- Source Mapping
-reify :: Located Sugar -> Located Sugar
-reify ls@(L s _) = L s (LocS ls)
+reify :: String -> Located Sugar -> Located Sugar
+reify lbl ls@(L s _) = L s (LocS lbl ls)
+
+reifyIf :: Located Sugar
+        -- ^ Condition Expression
+        -> Located Sugar
+        -- ^ Then Expression
+        -> Located Sugar
+        -- ^ Else Expression
+        -> Located Sugar
+
+reifyIf lc lt le = IfS <@> reify "condition"   lc
+                       <*> reify "then branch" lt
+                       <*> reify "else branch" le
+
+reifyOrd :: String -> Int -> Located Sugar -> Located Sugar
+reifyOrd lbl i = reify (ordinal i ++ " " ++ lbl)
+  where
+    ordinal n =
+      let sn   = show n
+          lsd  = n `mod` 10
+          lsd2 = n `mod` 100
+      in case lsd of
+        1 | lsd2 /= 11 -> sn ++ "st"
+        2 | lsd2 /= 12 -> sn ++ "nd"
+        3 | lsd2 /= 13 -> sn ++ "rd"
+        _              -> sn ++ "th"
+
+
+reifyList :: [Located Sugar] -> Located Sugar
+reifyList lss = enlist <@> loc (zipWith (reifyOrd "element") [s,s-1..1] lss)
+  where
+    s  = length lss
 
 apply :: Located Id -> [Located Sugar] -> Located Sugar
-apply x xs = AppS <@> x <*> loc (reify <@> xs)
+apply x xs = AppS <@> x <*> loc (zipWith (reifyOrd "argument") [1..] xs)
 
+-- Projections
 val :: Lexeme -> Located Sugar
 val = fmap trn
   where
@@ -233,8 +265,6 @@ ident = fmap trn
     trn (MonOp m) = m
     trn _         = error "ident: Not an identifier"
 
--- TODO: Errors should contain positions (line + column)
-
 -- Function Declarations
 mkFnArm :: (Located Id, Located [Patt])
         -- ^ Function Interface
@@ -244,16 +274,21 @@ mkFnArm :: (Located Id, Located [Patt])
         -- ^ Optional guard condition
         -> Located FnArm
 
-mkFnArm (li, lps) lb lg = FnArm <@> li <*> lps <*> lb <*> lg
+mkFnArm (li, lps) lb lg = FnArm <@> li <*> lps <*> reify label lb <*> lg
+  where
+    label = "body of \'" ++ dislocate li ++ "\'"
 
 fnToDecl :: [Located FnArm] -> Alex (Located Decl)
 fnToDecl body@(a:as)
   | (b:_) <- checkMatch name  = alexError $ mismatch name  "name"  b
   | (b:_) <- checkMatch arity = alexError $ mismatch arity "arity" b
-  | otherwise                 = return (Decl (name . dislocate $ a) <@> (FnS <@> loc body))
+  | otherwise                 = return (Decl fnName <@> reify label (FnS <@> loc body))
   where
     name  (FnArm x _ _ _) = x
     arity (FnArm _ fs _ _) = length fs
+
+    fnName = name . dislocate $ a
+    label  = "definition of '" ++ fnName ++ "'"
 
     checkMatch proj =
       let lproj = proj . dislocate
@@ -267,8 +302,10 @@ fnToDecl body@(a:as)
              , "."
              ]
 
-
 fnToDecl [] = error "fnToDecl: Empty function definition."
+
+anonFn :: Located [Patt] -> Located Sugar -> Located Sugar
+anonFn lps lb = FnS <@> loc [FnArm "" <@> lps <*> reify "function body" lb <*> pure Nothing]
 
 -- Operator Associativity Parsing
 mkOpExpr :: OpTree (Located Sugar) -> Located Sugar

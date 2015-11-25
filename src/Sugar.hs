@@ -30,7 +30,7 @@ data Sugar = LitS (LitB Sugar)
            | RSectS Id Sugar
            | LetS Id Sugar Sugar
            | SeqS Sugar Sugar
-           | LocS (Located Sugar)
+           | LocS String (Located Sugar)
              deriving (Eq, Show)
 
 -- | A functor whose least-fixed point is isomorphic to @ Sugar @.
@@ -45,7 +45,7 @@ data SugarB a = LitSB (LitB a)
               | RSectSB Id a
               | LetSB Id a a
               | SeqSB a a
-              | LocSB (Located a)
+              | LocSB String (Located a)
                 deriving (Eq, Show, Functor)
 
 -- | A top level statement, parametrised by its expression type.
@@ -82,7 +82,7 @@ instance Foldable Sugar where
   project (RSectS x f)     = RSectSB x f
   project (LetS x a b)     = LetSB x a b
   project (SeqS a b)       = SeqSB a b
-  project (LocS ls)        = LocSB ls
+  project (LocS lbl ls)    = LocSB lbl ls
 
 instance Unfoldable Sugar where
   embed (LitSB s)         = LitS s
@@ -96,4 +96,4 @@ instance Unfoldable Sugar where
   embed (RSectSB x f)     = RSectS x f
   embed (LetSB x a b)     = LetS x a b
   embed (SeqSB a b)       = SeqS a b
-  embed (LocSB ls)        = LocS ls
+  embed (LocSB lbl ls)    = LocS lbl ls

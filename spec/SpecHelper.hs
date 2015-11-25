@@ -18,13 +18,14 @@ import Data.Functor.Foldable
 import Desugar (desugarExpr)
 import Expr
 import GLParser (parseExpr)
-import Infer (TyError, typeCheck)
+import Infer (typeCheck)
 import Lexer
 import Location
 import Sugar
 import Test.Hspec
 import Test.HUnit (assertFailure)
 import Token
+import TyError
 import Type (Ty, alphaEq)
 
 lexFile :: FilePath -> [Token] -> Spec
@@ -84,14 +85,14 @@ locScanTokens input = return (runAlex input loop)
 stripLocS :: Sugar -> Sugar
 stripLocS = cata s
   where
-    s (LocSB le) = dislocate le
-    s e          = embed e
+    s (LocSB _ le) = dislocate le
+    s e            = embed e
 
 stripLocE :: Expr -> Expr
 stripLocE = cata s
   where
-    s (LocEB le) = dislocate le
-    s e          = embed e
+    s (LocEB _ le) = dislocate le
+    s e            = embed e
 
 parse :: BS.ByteString -> Result [Para Sugar]
 parse input = return (runAlex input pAndSExpr)
