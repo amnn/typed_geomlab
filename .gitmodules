@@ -1,0 +1,3 @@
+[submodule "alex"]
+	path = alex
+	url = https://github.com/simonmar/alex.git

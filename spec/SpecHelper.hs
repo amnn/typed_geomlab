@@ -12,6 +12,7 @@ module SpecHelper
        ) where
 
 import Prelude hiding (Foldable)
+import qualified Data.ByteString.Lazy.Char8 as BS
 import Control.Monad (unless)
 import Data.Functor.Foldable
 import Desugar (desugarExpr)
@@ -62,7 +63,7 @@ annL f s = f . L s
 
 type Result a = IO (Either String a)
 
-scanTokens :: String -> Result [Token]
+scanTokens :: BS.ByteString -> Result [Token]
 scanTokens input = return (runAlex input loop)
   where
     loop = do (L _ t) <- alexMonadScan
@@ -71,7 +72,7 @@ scanTokens input = return (runAlex input loop)
               else do rest <- loop
                       return (t:rest)
 
-locScanTokens :: String -> Result [Lexeme]
+locScanTokens :: BS.ByteString -> Result [Lexeme]
 locScanTokens input = return (runAlex input loop)
   where
     loop = do l@(L _ t) <- alexMonadScan
@@ -92,25 +93,25 @@ stripLocE = cata s
     s (LocEB le) = dislocate le
     s e          = embed e
 
-parse :: String -> Result [Para Sugar]
+parse :: BS.ByteString -> Result [Para Sugar]
 parse input = return (runAlex input pAndSExpr)
   where
     pAndSExpr = map (fmap stripLocS) <$> parseExpr
 
-locParse :: String -> Result [Para Sugar]
+locParse :: BS.ByteString -> Result [Para Sugar]
 locParse input = return (runAlex input parseExpr)
 
-desugar :: String -> Result [Para Expr]
+desugar :: BS.ByteString -> Result [Para Expr]
 desugar input = return (runAlex input pAndDExpr)
   where
     pAndDExpr = map (fmap (stripLocE . desugarExpr)) <$> parseExpr
 
-locDesugar :: String -> Result [Para Expr]
+locDesugar :: BS.ByteString -> Result [Para Expr]
 locDesugar input = return (runAlex input pAndDExpr)
   where
     pAndDExpr = map (fmap desugarExpr) <$> parseExpr
 
-tc :: String -> Result ([Para (Either TyError (Ty Id))])
+tc :: BS.ByteString -> Result ([Para (Either TyError (Ty Id))])
 tc input = return (runAlex input pDAndTCExpr)
   where
     pDAndTCExpr = typeCheck . map (fmap desugarExpr) <$> parseExpr
@@ -118,13 +119,13 @@ tc input = return (runAlex input pDAndTCExpr)
 testFile :: Show a
          => String
          -> (a -> a -> Bool)
-         -> (String -> Result a)
+         -> (BS.ByteString -> Result a)
          -> FilePath -> a -> Spec
 
 testFile typ cmp process fname expected =
   describe fname $ do
     it typ $ do
-      input <- readFile fname
+      input <- BS.readFile fname
       Right actual <- process input
       let msg = concat ["expected: ", show expected, "\n but got: ", show actual]
       unless (cmp expected actual) (assertFailure msg)

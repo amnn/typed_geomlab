@@ -8,12 +8,13 @@ module Lexer ( Alex
              , runAlex
              ) where
 
+import qualified Data.ByteString.Lazy.Char8 as BS
 import Data.Char (chr)
 import Location
 import Token
 }
 
-%wrapper "monad"
+%wrapper "monad-bytestring"
 
 $ws     = [\t\n\r\ ]
 $digit  = 0-9
@@ -33,8 +34,8 @@ geomlab :-
   $ws+     { skip }
   "{"      { skipComment }
 
-  "#" @ident { strTok (Atom . tail) }
-  "#" @op    { strTok (Atom . tail) }
+  "#" @ident { strTok (Atom . BS.unpack . BS.tail) }
+  "#" @op    { strTok (Atom . BS.unpack . BS.tail) }
 
   "[" { tok Bra  }
   "]" { tok Ket  }
@@ -45,7 +46,7 @@ geomlab :-
   ";" { tok Semi  }
   "|" { tok VBar  }
 
-  @num        { strTok (Num . read) }
+  @num        { strTok (Num . read . BS.unpack) }
   @strbegin\" { strTok (Str . dequote) }
 
   @ident { ident }
@@ -59,28 +60,30 @@ geomlab :-
   .                       { badToken }
 {
 
-dequote :: String -> String
-dequote = tail . init
+dequote :: BS.ByteString -> String
+dequote = BS.unpack . BS.tail . BS.init
 
-strTok :: (String -> Token) -> AlexAction Lexeme
-strTok t (pos, _, _, rest) len = return (mkLex len str pos)
+strTok :: (BS.ByteString -> Token) -> AlexAction Lexeme
+strTok t (pos, _, rest, _) len = return (mkLex (fromIntegral len) str pos)
   where
-    str = t (take len rest)
+    str = t (BS.take len rest)
 
 tok :: Token -> AlexAction Lexeme
 tok t = strTok (const t)
 
 ident :: AlexAction Lexeme
 ident = strTok $ \x ->
-          case lookupKw x of
+          let str = BS.unpack x
+          in case lookupKw str of
             Just t -> t
-            Nothing -> Ident x
+            Nothing -> Ident str
 
 op :: AlexAction Lexeme
 op = strTok $ \x ->
-       case lookupKw x of
+       let str = BS.unpack x
+       in case lookupKw str of
          Just t  -> t
-         Nothing -> BinOp x
+         Nothing -> BinOp str
 
 mkLex :: Int -> Token -> AlexPosn -> Lexeme
 mkLex len t (AlexPn o l c) = L (S (P l c) o len) t
@@ -103,11 +106,11 @@ alexEOF :: Alex Lexeme
 alexEOF = return (L Floating Eof)
 
 scanError :: String -> AlexAction a
-scanError msg (pos, _, _, str) _ =
+scanError msg (pos, _, str, _) _ =
   alexError (concat ["Syntax Error, ", msg, fmtPosn pos])
   where
     fmtPosn (AlexPn _ line col) =
-      concat ["near ", str, " at line ", show line, ", column ", show col, "."]
+      concat ["near ", BS.unpack str, " at line ", show line, ", column ", show col, "."]
 
 badToken :: AlexAction a
 badToken = scanError "#badtoken"

@@ -22,5 +22,6 @@ repl_options =
 guard :haskell, repl_options: repl_options do
   watch(%r{spec/.+Spec\.l?hs$})
   watch(%r{src/.+\.l?hs$})
+  watch(%r{src/.+\.(x|y)$})
   watch(%r{\.cabal$})
 end
