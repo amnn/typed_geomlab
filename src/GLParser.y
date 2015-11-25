@@ -97,11 +97,11 @@ ExprOrSect : let Decl in Expr      { declToLet $2 (reify "let body" $4) }
 
 Cond ::                            { Located Sugar }
 Cond : Term                        { $1 }
-     | if Cond then Cond else Cond { $1 *> reifyIf $2 $4 $6 }
+     | if Cond then Cond else Cond { reify "if expression" $ $1 *> reifyIf $2 $4 $6 }
 
 CondOrSect ::                            { Located Sugar }
 CondOrSect : TermOrSect                  { $1 }
-           | if Cond then Cond else Cond { $1 *> reifyIf $2 $4 $6 }
+           | if Cond then Cond else Cond { reify "if expression" $ $1 *> reifyIf $2 $4 $6 }
 
 Term ::       { Located Sugar }
 Term : Factor { $1 }
@@ -109,9 +109,9 @@ Term : Factor { $1 }
 
 TermOrSect ::             { Located Sugar }
 TermOrSect : Factor       { $1 }
-           | Factor BinOp { LSectS <@> reify "left section" $1 <*> $2 }
+           | Factor BinOp { reify "left section" $ LSectS <@> reify "operand" $1 <*> $2 }
            | OpTree       { mkOpExpr $1 }
-           | OpTree BinOp { LSectS <@> reify "left section" (mkOpExpr $1) <*> $2 }
+           | OpTree BinOp { reify "left section" $ LSectS <@> reify "operand" (mkOpExpr $1) <*> $2 }
 
 OpTree ::                    { OpTree (Located Sugar) }
 OpTree : Factor BinOp Factor { Op (dislocate $2) (Leaf $1) (Leaf $3) }
@@ -145,7 +145,11 @@ Primary : num                       { val $1 }
         | '[' ListExpr ']'          { reify (fst $2) $ $1 *> snd $2 <* $3 }
         | '(' monop ')'             { $1 *> val $2 <* $3 }
         | '(' BinOp ')'             { $1 *> (VarS <@> $2) <* $3 }
-        | '(' BinOpNoMinus Term ')' { $1 *> RSectS <@> $2 <*> reify "right section" $3 <* $4 }
+
+        | '(' BinOpNoMinus Term ')' { reify "right section" $
+                                        $1 *> RSectS <@> $2 <*> reify "operand" $3 <* $4
+                                    }
+
         | '(' ExprOrSect ')'        { $1 *> $2 <* $3 }
 
 Actuals ::                 { [Located Sugar] }
