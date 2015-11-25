@@ -71,6 +71,8 @@ data TyError = UnboundVarE Id
              | OccursE
             -- ^ When unifying a variable with a type, we found the variable
             -- within the type (A cycle was detected in the occurs check).
+             | CtxE (Located TyError)
+            -- ^ Adds context to an error in the form of a location.
                deriving (Eq, Show)
 
 -- | Constraint of all the Monads used by the type checker.
@@ -438,7 +440,10 @@ typeOf gloDefs = check
 
     check (SeqE a b) = check a >> check b
 
-    check (LocE le) = check (dislocate le)
+    check (LocE le) =
+      catchError (check (dislocate le)) $ \e -> do
+        throwError $ CtxE (le *> pure e)
+
     check _ = newVar
 
     checkArm etr (p, a) = do
