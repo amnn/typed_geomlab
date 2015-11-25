@@ -1,4 +1,5 @@
 {
+{-# LANGUAGE PatternGuards #-}
 module GLParser where
 
 import Lexer
@@ -247,12 +248,25 @@ mkFnArm (li, lps) lb lg = FnArm <@> li <*> lps <*> lb <*> lg
 
 fnToDecl :: [Located FnArm] -> Alex (Located Decl)
 fnToDecl body@(a:as)
-  | any (name a /=) (map name as)   = alexError "Parse Error, all function names need to match."
-  | any (arity a /=) (map arity as) = alexError "Parse Error, all arities must match."
-  | otherwise                       = return (Decl (name a) <@> (FnS <@> loc body))
+  | (b:_) <- checkMatch name  = alexError $ mismatch name  "name"  b
+  | (b:_) <- checkMatch arity = alexError $ mismatch arity "arity" b
+  | otherwise                 = return (Decl (name . dislocate $ a) <@> (FnS <@> loc body))
   where
-    name  lfa | (FnArm id _ _ _) <- dislocate lfa = id
-    arity lfa | (FnArm _ fs _ _) <- dislocate lfa = length fs
+    name  (FnArm x _ _ _) = x
+    arity (FnArm _ fs _ _) = length fs
+
+    checkMatch proj =
+      let lproj = proj . dislocate
+      in  filter ((lproj a /=) . lproj) as
+
+    mismatch proj label b =
+      concat [ "Parse Error, function ", label
+             , " mismatch"
+             , "\nbetween ", fmtErr (proj <$> a)
+             , "\n    and ", fmtErr (proj <$> b)
+             , "."
+             ]
+
 
 fnToDecl [] = error "fnToDecl: Empty function definition."
 
