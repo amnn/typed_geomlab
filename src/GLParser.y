@@ -129,16 +129,20 @@ BinOpNoMinus : '+'   { ident $1 }
 
 Factor ::             { Located Sugar }
 Factor : Primary      { $1 }
-       | monop Factor { apply (ident $1) [$2] }
-       | '-' Factor   { apply ($1 *> pure "~") [$2] }
+       | monop Factor { reify "function application" $ apply (ident $1) [$2] }
+       | '-' Factor   { reify "function application" $ apply ($1 *> pure "~") [$2] }
 
 Primary ::                          { Located Sugar }
 Primary : num                       { val $1 }
         | atom                      { val $1 }
         | str                       { val $1 }
         | ident                     { val $1 }
-        | ident '(' Actuals ')'     { apply (ident $1) (reverse $3) <* $4 }
-        | '[' ListExpr ']'          { $1 *> $2 <* $3 }
+
+        | ident '(' Actuals ')'     { reify "function application" $
+                                        apply (ident $1) (reverse $3) <* $4
+                                    }
+
+        | '[' ListExpr ']'          { reify (fst $2) $ $1 *> snd $2 <* $3 }
         | '(' monop ')'             { $1 *> val $2 <* $3 }
         | '(' BinOp ')'             { $1 *> (VarS <@> $2) <* $3 }
         | '(' BinOpNoMinus Term ')' { $1 *> RSectS <@> $2 <*> reify "right section" $3 <* $4 }
@@ -149,10 +153,16 @@ Actuals : {- empty -}      { [] }
         | Expr             { [$1] }
         | Actuals ',' Expr { $3 : $1 }
 
-ListExpr ::               { Located Sugar }
-ListExpr : Actuals        { reifyList $1 }
-         | Expr '..' Expr { RangeS <@> reify "lowerbound" $1 <*> reify "upperbound" $3 }
-         | Expr '|' Gens  { ListCompS <@> reify "yield" $1 <*> loc (reverse $3) }
+ListExpr ::               { ( String, Located Sugar) }
+ListExpr : Actuals        { ( "list", reifyList $1) }
+
+         | Expr '..' Expr { ( "range"
+                            , RangeS <@> reify "lowerbound" $1 <*> reify "upperbound" $3
+                            ) }
+
+         | Expr '|' Gens  { ( "list comprehension"
+                            , ListCompS <@> reify "yield" $1 <*> loc (reverse $3)
+                            ) }
 
 Gens ::                        { [Located Gen] }
 Gens : Patt '<-' Expr          { [GenB <@> $1 <*> reify "generator" $3] }
@@ -225,14 +235,15 @@ reifyOrd lbl i = reify (ordinal i ++ " " ++ lbl)
         3 | lsd2 /= 13 -> sn ++ "rd"
         _              -> sn ++ "th"
 
-
 reifyList :: [Located Sugar] -> Located Sugar
-reifyList lss = enlist <@> loc (zipWith (reifyOrd "element") [s,s-1..1] lss)
+reifyList [ls] = enlist <@> loc [reify "element" ls]
+reifyList lss  = enlist <@> loc (zipWith (reifyOrd "element") [s,s-1..1] lss)
   where
-    s  = length lss
+    s = length lss
 
 apply :: Located Id -> [Located Sugar] -> Located Sugar
-apply x xs = AppS <@> x <*> loc (zipWith (reifyOrd "argument") [1..] xs)
+apply x [y] = AppS <@> x <*> loc [reify "argument" y]
+apply x xs  = AppS <@> x <*> loc (zipWith (reifyOrd "argument") [1..] xs)
 
 -- Projections
 val :: Lexeme -> Located Sugar
@@ -310,7 +321,7 @@ anonFn lps lb = FnS <@> loc [FnArm "" <@> lps <*> reify "function body" lb <*> p
 -- Operator Associativity Parsing
 mkOpExpr :: OpTree (Located Sugar) -> Located Sugar
 mkOpExpr (Leaf e)   = e
-mkOpExpr (Op i l r) = apply (pure i) [mkOpExpr l, mkOpExpr r]
+mkOpExpr (Op i l r) = reify "function application" $ apply (pure i) [mkOpExpr l, mkOpExpr r]
 
 parseError :: Lexeme -> Alex a
 parseError l = alexError msg

@@ -21,7 +21,8 @@ executable typed-geomlab
                        recursion-schemes ==4.1.*,
                        mtl ==2.2.*,
                        monad-st ==0.2.*,
-                       bytestring ==0.10.*
+                       bytestring ==0.10.*,
+                       ansi-terminal ==0.6.*
 
 test-suite spec
   type:             exitcode-stdio-1.0
@@ -38,5 +39,6 @@ test-suite spec
                     mtl ==2.2.*,
                     monad-st ==0.2.*,
                     bytestring ==0.10.*,
+                    ansi-terminal ==0.6.*,
                     hspec ==2.2.*,
                     HUnit ==1.3.*
