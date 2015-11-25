@@ -21,7 +21,10 @@ data TyError = UnboundVarE Id
 printError :: FilePath -> BS.ByteString -> TyError -> IO ()
 printError fname input (CtxE root (L topSp eChain)) = do
   newLine
-  setSGR [SetUnderlining SingleUnderline]
+  setSGR [ SetUnderlining SingleUnderline
+         , SetColor Foreground Vivid Red
+         , SetConsoleIntensity BoldIntensity
+         ]
   errHead topSp; putStr "Error in "; putStrLn root
   setSGR []; newLine
   unwind topSp eChain
@@ -47,9 +50,10 @@ printError fname input (CtxE root (L topSp eChain)) = do
 
     unwind sp (CtxE lbl (L sp' (CtxE lbl' (L sp'' e))))
       | sp == sp' = do
-      unwind sp'' e
-      newLine; errHead sp'
-      mapM_ putStr ["In the ", lbl', " of the "]; putStrLn lbl
+      unwind sp'' e; newLine
+      setSGR [SetColor Foreground Dull Red]
+      errHead sp'; mapM_ putStr ["In the ", lbl', " of the "]; putStrLn lbl
+      setSGR []
       newLine; snip sp'
 
     unwind _ (CtxE lbl (L sp e)) = do
