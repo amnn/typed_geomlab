@@ -19,100 +19,90 @@ data TyError = UnboundVarE Id
                deriving (Eq, Show)
 
 printError :: FilePath -> BS.ByteString -> TyError -> IO ()
-printError fname input (CtxE root (L topSp eChain)) = do
+printError fname input (CtxE root chain@(L rootSp _)) = do
   newLine
   setSGR [ SetUnderlining SingleUnderline
          , SetColor Foreground Vivid Red
          , SetConsoleIntensity BoldIntensity
          ]
-  errHead topSp; putStr "Error in "; putStrLn root
+  errHead rootSp; putStr "Error in the "; putStrLn root
   setSGR []; newLine
-  unwind topSp eChain
+  unwind chain
   newLine
 
   where
     errHead sp | (P l c) <- start sp =
       mapM_ putStr [fname, ":", show l, ":", show c, ": "]
 
-    snip sp = mapM_ (indentBS 1) . BS.lines
-            . BS.take (fromIntegral (width sp))
-            . BS.drop (fromIntegral (offset sp))
-            $ input
+    snip (S _ o w) = mapM_ indentBS . BS.lines $ extract o w
+    snip _         = error "snip: No offset!"
+
+    nest (S _ o1 w) (S _ o2 w2) =
+      let w1 = o2 - o1
+          o3 = o2 + w2
+          w3 = o1 + w - o3
+          prologue = extract o1 w1
+          focus    = extract o2 w2
+          epilogue = extract o3 w3
+      in do
+        indentMultiFstBS prologue
+        setSGR [SetColor Foreground Vivid Blue]
+        indentMultiBS focus
+        setSGR []
+        indentMultiBS epilogue
+        newLine
+
+    nest _ _ = error "nest: no offset!"
+
+    indentMultiFstBS msg =
+      let nl              = '\n' == BS.last msg
+          go []           = []
+          go [l] | not nl = [putStr "    " >> BS.putStr l]
+          go (l:ls)       = indentBS l : go ls
+      in sequence_ . go . BS.lines $ msg
+
+    indentMultiBS msg =
+      let nl               = '\n' == BS.last msg
+          go []            = []
+          go [l]  | not nl = [BS.putStr l]
+          go (l:ls)        = BS.putStrLn l : go' ls
+          go' []           = []
+          go' [l] | not nl = [putStr "    " >> BS.putStr l]
+          go' (l:ls)       = indentBS l : go' ls
+      in sequence_ . go . BS.lines $ msg
+
+    extract o w = BS.take (fromIntegral w)
+                . BS.drop (fromIntegral o)
+                $ input
 
     newLine = putStrLn ""
 
-    indentS  n msg = do { putStr $ replicate (4*n) ' '; putStrLn msg }
-    indentBS n msg = do { putStr $ replicate (4*n) ' '; BS.putStrLn msg }
+    indentS  msg = putStr "    " >> putStrLn msg
+    indentBS msg = putStr "    " >> BS.putStrLn msg
 
-    unwind _ (UnboundVarE x) = indentS 1 $ "unbound variable '" ++ x ++ "'"
-    unwind _ UnificationE    = indentS 1 "unification error"
-    unwind _ OccursE         = indentS 1 "cyclicity error"
+    unwind (L _ (UnboundVarE x)) = indentS $ "unbound variable '" ++ x ++ "'"
+    unwind (L _ UnificationE)    = indentS "unification error"
+    unwind (L _ OccursE)         = indentS "cyclicity error"
 
-    unwind sp (CtxE lbl (L sp' (CtxE lbl' (L sp'' e))))
+    unwind (L sp (CtxE lbl (L sp' (CtxE lbl' le@(L sp'' _)))))
       | sp == sp' = do
-      unwind sp'' e; newLine
-      setSGR [SetColor Foreground Dull Red]
+      unwind le
+      newLine; setSGR [SetColor Foreground Dull Red]
       errHead sp'; mapM_ putStr ["In the ", lbl', " of the "]; putStrLn lbl
-      setSGR []
-      newLine; snip sp'
+      setSGR []; newLine
+      nest sp' sp''
 
-    unwind _ (CtxE lbl (L sp e)) = do
-      unwind sp e
-      newLine; errHead sp
-      putStr "In the "; putStrLn lbl
-      newLine; snip sp
+    unwind (L sp (CtxE _ le@(L sp' _))) | sp == sp' = unwind le
+
+    unwind (L _  (CtxE lbl le@(L sp _))) = do
+      unwind le
+      newLine; setSGR [SetColor Foreground Dull Red]
+      errHead sp; putStr "In the "; putStrLn lbl
+      setSGR []; newLine
+      snip sp
 
 printError _ _ e = do
   putStrLn "*** INTERNAL ERROR ***"
   putStrLn "An error was returned without a root location"
   putStrLn "Here it is anyway: "
   print e
-
-{-
--- Check for Duplicate Spans.
--- Print the top most location
--- Print the rest in reverse order
-  -- Title with file and line/column indicator and label
-  -- Snippet of code
-
-If two contexts have the same span, the outer is a child context, and the
-inner is a parent context, and we print them together.
-
-[decl -> list] -> [element -> function] -> argument -> let
-
-print decl
-
-[decl* -> list] -> [element -> function] -> argument -> let
-
-print element of list
-
-[element* -> function] -> argument -> let
-
-print argument of function
-
-*argument -> let
-
-print let
-
-element of list; argument of function application
-
-[element -> function] -> argument
-argument of function application
-
-discard grandparent, print parent compacted with child
-recurse with child still attached.
-
-
-not.geom:1:2: Error in definition of 'not'
-
-    unbound variable 'x'
-
-not.geom:3:4: In the 1st argument of the function application
-
-    foo(*x*, y)
-
-not.geom:5:6: In the element of the list
-
-    [*foo(x, y)*]
-
--}
