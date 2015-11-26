@@ -88,7 +88,7 @@ printError fname input (CtxE root chain@(L rootSp _)) = do
       | sp == sp' = do
       unwind le
       newLine; setSGR [SetColor Foreground Dull Red]
-      errHead sp'; mapM_ putStr ["In the ", lbl', " of the "]; putStrLn lbl
+      errHead sp''; mapM_ putStr ["In the ", lbl', " of the "]; putStrLn lbl
       setSGR []; newLine
       nest sp' sp''
 
