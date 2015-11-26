@@ -9,27 +9,23 @@ import Lexer
 import Sugar
 import System.Console.ANSI
 import System.Environment
-import Token
 import TyError
-import Type
 
 runAndFormat :: Show a => (a -> IO ()) -> Alex a -> BS.ByteString -> IO ()
 runAndFormat fmt am input = either putStrLn fmt (runAlex input am)
 
-printTy :: Id -> Ty Id -> IO ()
-printTy x t = do
-  setSGR [SetColor Foreground Dull Green]
-  putStrLn $ x ++ " :: " ++ show t
-  setSGR []
+inGreen :: IO () -> IO ()
+inGreen io = setSGR [SetColor Foreground Dull Green] >> io >> setSGR []
 
 tc :: FilePath -> BS.ByteString -> IO ()
 tc fname input = runAndFormat (mapM_ fmt) tcM input
   where
     tcM                   = typeCheck . map (fmap desugarExpr) <$> parseExpr
-    fmt (Def x (Right t)) = printTy x t
 
+    fmt (Def x (Right t)) = inGreen (putStrLn $ x ++ " :: " ++ show t)
     fmt (Def _ (Left e))  = printError fname input e
-    fmt (Eval et)         = either (printError fname input) print et
+    fmt (Eval  (Right t)) = inGreen (putStrLn $ show t)
+    fmt (Eval  (Left e))  = printError fname input e
 
 processFile :: String -> IO ()
 processFile fname = do

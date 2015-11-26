@@ -85,12 +85,15 @@ Id : ident { ident $1 }
 -- Expressions
 Expr ::                      { Located Sugar }
 Expr : Cond                  { $1 }
-     | let Decl in Expr      { declToLet $2 (reify "let body" $4) }
+     | let Decl in Expr      { reify "let expression" $ $1 *> declToLet $2 (reify "expression" $4) }
      | function Formals Expr { $1 *> anonFn $2 $3 }
      | Cond '>>' Expr        { SeqS <@> $1 <*> $3 }
 
 ExprOrSect ::                      { Located Sugar }
-ExprOrSect : let Decl in Expr      { declToLet $2 (reify "let body" $4) }
+ExprOrSect : let Decl in Expr      { reify "let expression" $
+                                       $1 *> declToLet $2 (reify "expression" $4)
+                                   }
+
            | function Formals Expr { $1 *> anonFn $2 $3 }
            | CondOrSect            { $1 }
            | Cond '>>' Expr        { SeqS <@> $1 <*> $3 }
@@ -109,9 +112,9 @@ Term : Factor { $1 }
 
 TermOrSect ::             { Located Sugar }
 TermOrSect : Factor       { $1 }
-           | Factor BinOp { reify "left section" $ LSectS <@> reify "operand" $1 <*> $2 }
+           | Factor BinOp { LSectS <@> reify "operand" $1 <*> $2 }
            | OpTree       { mkOpExpr $1 }
-           | OpTree BinOp { reify "left section" $ LSectS <@> reify "operand" (mkOpExpr $1) <*> $2 }
+           | OpTree BinOp { LSectS <@> reify "operand" (mkOpExpr $1) <*> $2 }
 
 OpTree ::                    { OpTree (Located Sugar) }
 OpTree : Factor BinOp Factor { Op (dislocate $2) (Leaf $1) (Leaf $3) }
@@ -150,7 +153,11 @@ Primary : num                       { val $1 }
                                         $1 *> RSectS <@> $2 <*> reify "operand" $3 <* $4
                                     }
 
-        | '(' ExprOrSect ')'        { $1 *> $2 <* $3 }
+        | '(' ExprOrSect ')'        { let expr = $1 *> $2 <* $3
+                                      in if isLSect (dislocate expr)
+                                      then reify "left section" $ expr
+                                      else expr
+                                    }
 
 Actuals ::                 { [Located Sugar] }
 Actuals : {- empty -}      { [] }
@@ -248,6 +255,12 @@ reifyList lss  = enlist <@> loc (zipWith (reifyOrd "element") [s,s-1..1] lss)
 apply :: Located Id -> [Located Sugar] -> Located Sugar
 apply x [y] = AppS <@> x <*> loc [reify "argument" y]
 apply x xs  = AppS <@> x <*> loc (zipWith (reifyOrd "argument") [1..] xs)
+
+isLSect :: Sugar -> Bool
+isLSect (LSectS _ _)     = True
+isLSect (LocS _ (L _ s)) = isLSect s
+isLSect _                = False
+
 
 -- Projections
 val :: Lexeme -> Located Sugar

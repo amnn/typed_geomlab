@@ -45,46 +45,58 @@ spec = do
 
   locParseFile "test/monop_fn.geom" $
     [ Eval (annL (LocS "expression") (S (P 1 1) 0 5)
-        (AppS "~" [(annL (LocS "1st argument") (S (P 1 2) 1 4) (numB 10.0))]))
+              (annL (LocS "function application") (S (P 1 1) 0 5)
+                 (AppS "~" [(annL (LocS "argument") (S (P 1 2) 1 4) (numB 10.0))])))
 
     , Eval (annL (LocS "expression") (S (P 1 8) 7 3)
         (LitS (NumB (-10.0))))
 
     , Eval (annL (LocS "expression") (S (P 1 13) 12 6)
-        (AppS "~" [(annL (LocS "1st argument") (S (P 1 14) 13 5) (numB (-10)))]))
+              (annL (LocS "function application") (S (P 1 13) 12 6)
+                 (AppS "~" [(annL (LocS "argument") (S (P 1 14) 13 5) (numB (-10)))])))
     ]
 
   locParseFile "test/neg.geom" $
     [ Def "x" (annL (LocS "definition of 'x'") (S (P 1 12) 11 1) (numB 1))
 
     , Eval (annL (LocS "expression") (S (P 3 1) 15 6)
-              (AppS "~" [annL (LocS "1st argument") (S (P 3 3) 17 4)
-                           (AppS "~" [annL (LocS "1st argument") (S (P 3 5) 19 2)
-                                        (numB 10.0)])]))
+              (annL (LocS "function application") (S (P 3 1) 15 6)
+                 (AppS "~" [annL (LocS "argument") (S (P 3 3) 17 4)
+                             (annL (LocS "function application") (S (P 3 3) 17 4)
+                                (AppS "~" [annL (LocS "argument") (S (P 3 5) 19 2)
+                                             (numB 10.0)]))])))
 
     , Eval
         (annL (LocS "expression") (S (P 3 9) 23 13)
-           (AppS "+" [ annL (LocS "1st argument") (S (P 3 9) 23 1) (numB 1)
-                     , annL (LocS "2nd argument") (S (P 3 13) 27 9)
-                         (AppS "~" [ annL (LocS "1st argument") (S (P 3 15) 29 7)
-                                       (AppS "+" [ annL (LocS "1st argument") (S (P 3 16) 30 1)
-                                                     (VarS "x")
-                                                 , annL (LocS "2nd argument") (S (P 3 20) 34 1)
-                                                     (numB 1.0)
-                                                 ])
-                                   ])
-                     ]))
+           (annL (LocS "function application") (S (P 3 9) 23 13)
+              (AppS "+" [ annL (LocS "1st argument") (S (P 3 9) 23 1) (numB 1)
+                        , annL (LocS "2nd argument") (S (P 3 13) 27 9)
+                            (annL (LocS "function application") (S (P 3 13) 27 9)
+                               (AppS "~" [ annL (LocS "argument") (S (P 3 15) 29 7)
+                                             (annL (LocS "function application") (S (P 3 16) 30 5)
+                                                (AppS "+" [ annL (LocS "1st argument")
+                                                              (S (P 3 16) 30 1)
+                                                              (VarS "x")
+                                                          , annL (LocS "2nd argument")
+                                                              (S (P 3 20) 34 1)
+                                                              (numB 1.0)
+                                                          ]))
+                                         ]))
+                        ])))
 
     , Eval
         (annL (LocS "expression") (S (P 3 24) 38 10)
-           (AppS "+" [ annL (LocS "1st argument") (S (P 3 24) 38 6)
-                         (AppS "+" [ annL (LocS "1st argument") (S (P 3 24) 38 1) (numB 1.0)
-                                   , annL (LocS "2nd argument") (S (P 3 28) 42 2)
-                                       (AppS "~" [annL (LocS "1st argument") (S (P 3 29) 43 1)
-                                                    (VarS "x")])
-                                   ])
-                     , annL (LocS "2nd argument") (S (P 3 33) 47 1) (numB 1.0)
-                     ]))
+           (annL (LocS "function application") (S (P 3 24) 38 10)
+              (AppS "+" [ annL (LocS "1st argument") (S (P 3 24) 38 6)
+                            (annL (LocS "function application") (S (P 3 24) 38 6)
+                               (AppS "+" [ annL (LocS "1st argument") (S (P 3 24) 38 1) (numB 1.0)
+                                         , annL (LocS "2nd argument") (S (P 3 28) 42 2)
+                                             (annL (LocS "function application") (S (P 3 28) 42 2)
+                                                (AppS "~" [annL (LocS "argument") (S (P 3 29) 43 1)
+                                                             (VarS "x")]))
+                                         ]))
+                        , annL (LocS "2nd argument") (S (P 3 33) 47 1) (numB 1.0)
+                        ])))
     ]
 
   locParseFile "test/not.geom" $
@@ -97,10 +109,12 @@ spec = do
                             Nothing
                         ]))
     , Eval (annL (LocS "expression") (S (P 4 1) 52 8)
-              (AppS "not" [annL (LocS "1st argument") (S (P 4 5) 56 4) (VarS "true")]))
+              (annL (LocS "function application") (S (P 4 1) 52 8)
+                 (AppS "not" [annL (LocS "argument") (S (P 4 5) 56 4) (VarS "true")])))
 
     , Eval (annL (LocS "expression") (S (P 5 1) 62 9)
-              (AppS "not" [annL (LocS "1st argument") (S (P 5 5) 66 5) (VarS "false")]))
+              (annL (LocS "function application") (S (P 5 1) 62 9)
+                 (AppS "not" [annL (LocS "argument") (S (P 5 5) 66 5) (VarS "false")])))
     ]
 
   parseFile "test/list_comp.geom" $
@@ -143,30 +157,35 @@ spec = do
 
   locParseFile "test/src_map_list_comp.geom" $
     [ Eval (annL (LocS "expression") (S (P 1 1) 0 18)
-              (ListCompS (annL (LocS "yield") (S (P 1 3) 2 1) (VarS "x"))
-                 [ GenB (VarP "x")
-                        (annL (LocS "generator") (S (P 1 12) 11 6)
-                           (RangeS (annL (LocS "lowerbound") (S (P 1 13) 12 1) (VarS "a"))
-                                   (annL (LocS "upperbound") (S (P 1 16) 15 1) (VarS "b"))))
-                 ]))
+              (annL (LocS "list comprehension") (S (P 1 1) 0 18)
+                 (ListCompS (annL (LocS "yield") (S (P 1 3) 2 1) (VarS "x"))
+                    [ GenB (VarP "x")
+                           (annL (LocS "generator") (S (P 1 12) 11 6)
+                              (annL (LocS "range") (S (P 1 12) 11 6)
+                                 (RangeS (annL (LocS "lowerbound") (S (P 1 13) 12 1) (VarS "a"))
+                                         (annL (LocS "upperbound") (S (P 1 16) 15 1) (VarS "b")))))
+                    ])))
 
     , Eval (annL (LocS "expression") (S (P 2 1) 20 26)
-              (ListCompS (annL (LocS "yield") (S (P 2 3) 22 1) (VarS "x"))
-                [ GenB (enlist [VarP "_", VarP "x"])
-                       (annL (LocS "generator") (S (P 2 17) 36 2) (VarS "xs"))
-                , FilterB (annL (LocS "guard") (S (P 2 25) 44 1) (VarS "y"))
-                ]))
+              (annL (LocS "list comprehension") (S (P 2 1) 20 26)
+                 (ListCompS (annL (LocS "yield") (S (P 2 3) 22 1) (VarS "x"))
+                    [ GenB (enlist [VarP "_", VarP "x"])
+                           (annL (LocS "generator") (S (P 2 17) 36 2) (VarS "xs"))
+                    , FilterB (annL (LocS "guard") (S (P 2 25) 44 1) (VarS "y"))
+                    ])))
 
     , Eval (annL (LocS "expression") (S (P 3 1) 48 33)
-              (ListCompS (annL (LocS "yield") (S (P 3 3) 50 6)
-                            (enlist [ annL (LocS "2nd element") (S (P 3 7) 54 1) (VarS "y")
-                                    , annL (LocS "1st element") (S (P 3 4) 51 1) (VarS "x")
-                                    ]))
-                [ GenB (enlist [VarP "_", VarP "x"])
-                       (annL (LocS "generator") (S (P 3 22) 69 2) (VarS "xs"))
-                , GenB (VarP "y")
-                       (annL (LocS "generator") (S (P 3 31) 78 2) (VarS "ys"))
-                ]))
+              (annL (LocS "list comprehension") (S (P 3 1) 48 33)
+                 (ListCompS (annL (LocS "yield") (S (P 3 3) 50 6)
+                               (annL (LocS "list") (S (P 3 3) 50 6)
+                                  (enlist [ annL (LocS "2nd element") (S (P 3 7) 54 1) (VarS "y")
+                                          , annL (LocS "1st element") (S (P 3 4) 51 1) (VarS "x")
+                                          ])))
+                   [ GenB (enlist [VarP "_", VarP "x"])
+                          (annL (LocS "generator") (S (P 3 22) 69 2) (VarS "xs"))
+                   , GenB (VarP "y")
+                          (annL (LocS "generator") (S (P 3 31) 78 2) (VarS "ys"))
+                   ])))
     ]
 
   locParseFile "test/empty.geom" $
@@ -272,19 +291,25 @@ spec = do
 
   locParseFile "test/src_map_section.geom" $
     [ Eval (annL (LocS "expression") (S (P 1 1) 0 5)
-        (RSectS ":" (annL (LocS "right section") (S (P 1 3) 2 2) nilB)))
+              (annL (LocS "right section") (S (P 1 1) 0 5)
+                 (RSectS ":" (annL (LocS "operand") (S (P 1 3) 2 2)
+                                (annL (LocS "list") (S (P 1 3) 2 2) nilB)))))
 
     , Eval (annL (LocS "expression") (S (P 1 8) 7 8)
-        (RSectS ":" (annL (LocS "right section") (S (P 1 10) 9 5)
-                       (consB (annL (LocS "1st element") (S (P 1 11) 10 3)
-                                 (strB "a"))
-                              nilB))))
+              (annL (LocS "right section") (S (P 1 8) 7 8)
+                 (RSectS ":" (annL (LocS "operand") (S (P 1 10) 9 5)
+                                (annL (LocS "list") (S (P 1 10) 9 5)
+                                   (consB (annL (LocS "element") (S (P 1 11) 10 3)
+                                             (strB "a"))
+                                          nilB))))))
 
     , Eval (annL (LocS "expression") (S (P 1 18) 17 4)
-              (LSectS (annL (LocS "left section") (S (P 1 19) 18 1) (numB 1)) ":"))
+              (annL (LocS "left section") (S (P 1 18) 17 4)
+                 (LSectS (annL (LocS "operand") (S (P 1 19) 18 1) (numB 1)) ":")))
 
     , Eval (annL (LocS "expression") (S (P 1 24) 23 7)
-              (LSectS (annL (LocS "left section") (S (P 1 25) 24 4) (atomB "foo")) ":"))
+              (annL (LocS "left section") (S (P 1 24) 23 7)
+                 (LSectS (annL (LocS "operand") (S (P 1 25) 24 4) (atomB "foo")) ":")))
     ]
 
   parseFile "test/gen_sym.geom" $
