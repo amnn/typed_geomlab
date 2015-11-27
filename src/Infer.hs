@@ -290,7 +290,9 @@ unify _tr _ur = do
             mapM_ markTy [_tr, _ur]
             unifySub minLvl tyT tyU
             mapM_ (flip setLevel minLvl) [_tr, _ur]
-          _ -> throwError UnificationE
+          _ -> do
+            [te, ta] <- mapM resolveTyRef [_tr, _ur]
+            throwError $ UnificationE te ta
       _ -> throwError OccursE
   where
     link vr wr = do
@@ -524,7 +526,7 @@ initialDefs = H.fromList <$> mapM absDef ts
          , ("_update", ArrT [HashT (VarT "k") (VarT "v"), VarT "k", VarT "v"] (VarT "v"))
          , ("_syntax", HashT AtomT (VarT "v"))
          , ("_debug",  ArrT [] BoolT)
-         , ("_print",  ArrT [StrT] StrT)
+         , ("_print",  ArrT [StrT] (ListT (VarT "a")))
          ]
 
 -- | Concrete Monad Transformer Stack satisfying the @ MonadInfer @

@@ -4,12 +4,13 @@ import qualified Data.ByteString.Lazy.Char8 as BS
 import Location
 import System.Console.ANSI
 import Token
+import Type
 
 -- | Possible Type Errors that the type checker may emit
 data TyError = UnboundVarE Id
             -- ^ A free variable was found for which no type exists
             -- (i.e. undefined variable).
-             | UnificationE
+             | UnificationE (Ty Id) (Ty Id)
             -- ^ Could not unify two types.
              | OccursE
             -- ^ When unifying a variable with a type, we found the variable
@@ -77,12 +78,15 @@ printError fname input (CtxE root chain@(L rootSp _)) = do
 
     newLine = putStrLn ""
 
-    indentS  msg = putStr "    " >> putStrLn msg
-    indentBS msg = putStr "    " >> BS.putStrLn msg
+    indentS n msg = putStr (replicate (4*n) ' ') >> putStrLn msg
+    indentBS  msg = putStr "    " >> BS.putStrLn msg
 
-    unwind (L _ (UnboundVarE x)) = indentS $ "unbound variable '" ++ x ++ "'"
-    unwind (L _ UnificationE)    = indentS "unification error"
-    unwind (L _ OccursE)         = indentS "cyclicity error"
+    unwind (L _ OccursE)                = indentS 1 "cyclicity error"
+    unwind (L _ (UnboundVarE x))        = indentS 1 $ "Unbound variable '" ++ x ++ "'."
+    unwind (L _ (UnificationE te ta)) = do
+      indentS 1 "Failed to unify types:"
+      indentS 2 $ "Expected: " ++ show te
+      indentS 2 $ "Actual:   " ++ show ta
 
     unwind (L sp (CtxE lbl (L sp' (CtxE lbl' le@(L sp'' _)))))
       | sp == sp' = do
