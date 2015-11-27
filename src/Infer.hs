@@ -269,7 +269,12 @@ updateLevel lvl tr = do
 
 -- | Massage two type references until they are both the 'same' (not counting
 -- forwarding pointers).
-unify :: MonadInfer m => TyRef (World m) -> TyRef (World m) -> m ()
+unify :: MonadInfer m
+      => TyRef (World m)
+      -- ^ The expected type
+      -> TyRef (World m)
+      -- ^ The actual type
+      -> m ()
 unify _tr _ur = do
   [_tr, _ur] <- mapM repr [_tr, _ur]
   if _tr == _ur
@@ -395,7 +400,7 @@ typeOf gloDefs = check
     check (IfE c t e) = do
       [ctr, ttr, tte] <- mapM check [c, t, e]
       btr <- newTy BoolTB
-      unify ctr btr
+      unify btr ctr
       unify ttr tte
       return ttr
 
@@ -421,7 +426,7 @@ typeOf gloDefs = check
     check (LetE a b) = do
       atr <- newScope $ do
         ltr <- pushLocal
-        check a >>= unify ltr
+        unify ltr =<< check a
         return ltr
       generalise atr
       btr <- check b
@@ -437,7 +442,7 @@ typeOf gloDefs = check
     check _ = newVar
 
     checkArm etr (p, a) = do
-      patTy p >>= unify etr
+      unify etr =<< patTy p
       atr <- check a
       replicateM_ (holes p) popLocal
       return atr
