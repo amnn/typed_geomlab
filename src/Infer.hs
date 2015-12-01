@@ -435,6 +435,7 @@ typeOf gloDefs = check
       atr <- newScope $ do
         ltr <- pushLocal
         unify ltr =<< check a
+        cycleFree ltr
         return ltr
       generalise atr
       btr <- check b
