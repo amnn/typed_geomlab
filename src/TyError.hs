@@ -10,8 +10,10 @@ import Type
 data TyError = UnboundVarE Id
             -- ^ A free variable was found for which no type exists
             -- (i.e. undefined variable).
-             | UnificationE (Ty Id) (Ty Id)
-            -- ^ Could not unify two types.
+             | UnificationE (Ty Id) (Ty Id) (Maybe (Ty Id, Ty Id))
+            -- ^ Could not unify two types. Optionally, the error occurred in
+            -- the unification of larger types which may also be given.
+
              | OccursE
             -- ^ When unifying a variable with a type, we found the variable
             -- within the type (A cycle was detected in the occurs check).
@@ -81,12 +83,19 @@ printError fname input (CtxE root chain@(L rootSp _)) = do
     indentS n msg = putStr (replicate (4*n) ' ') >> putStrLn msg
     indentBS  msg = putStr "    " >> BS.putStrLn msg
 
-    unwind (L _ OccursE)                = indentS 1 "cyclicity error"
-    unwind (L _ (UnboundVarE x))        = indentS 1 $ "Unbound variable '" ++ x ++ "'."
-    unwind (L _ (UnificationE te ta)) = do
+    unwind (L _ OccursE)                   = indentS 1 "Attempted to construct an infinite type!"
+    unwind (L _ (UnboundVarE x))           = indentS 1 $ "Unbound variable '" ++ x ++ "'."
+    unwind (L _ (UnificationE te ta ctx)) = do
       indentS 1 "Failed to unify types:"
       indentS 2 $ "Expected: " ++ show te
       indentS 2 $ "Actual:   " ++ show ta
+      case ctx of
+        Nothing -> return ()
+        Just (pte, pta) -> do
+          newLine
+          indentS 1 "Whilst trying to unify:"
+          indentS 2 $ "Expected: " ++ show pte
+          indentS 2 $ "Actual:   " ++ show pta
 
     unwind (L sp (CtxE lbl (L sp' (CtxE lbl' le@(L sp'' _)))))
       | sp == sp' = do

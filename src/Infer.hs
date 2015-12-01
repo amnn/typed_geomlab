@@ -275,6 +275,7 @@ unify :: MonadInfer m
       -> TyRef (World m)
       -- ^ The actual type
       -> m ()
+
 unify _tr _ur = do
   [_tr, _ur] <- mapM repr [_tr, _ur]
   if _tr == _ur
@@ -297,18 +298,25 @@ unify _tr _ur = do
             mapM_ (flip setLevel minLvl) [_tr, _ur]
           _ -> do
             [te, ta] <- mapM resolveTyRef [_tr, _ur]
-            throwError $ UnificationE te ta
+            throwError $ UnificationE te ta Nothing
       _ -> throwError OccursE
   where
     link vr wr = do
       modifyIRef wr $ \st -> st{ty = VarTB (FwdV vr)}
 
-    unifySub l u v = sequence_ $ (zipWith (unifyLev l) `on` toList) u v
+    unifySub l u v =
+      let recur = sequence_ $ (zipWith (unifyLev l) `on` toList) u v
+      in  catchError recur addUnifyCtx
 
     unifyLev l vr wr = do
       vp <- repr vr
       updateLevel l vp
       unify vp wr
+
+    addUnifyCtx (UnificationE te ta _) = do
+      [pte, pta] <- mapM resolveTyRef [_tr, _ur]
+      throwError $ UnificationE te ta (Just (pte, pta))
+    addUnifyCtx e = throwError e
 
 -- | Find all type references from lower scopes than the current one, and ensure
 -- that level adjustments have all been made for them. This is done before a
