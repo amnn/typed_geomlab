@@ -59,6 +59,13 @@ data Para a = Def Id a | Eval a
 instance EmbedsLit Sugar where
   embedLit = LitS
 
+-- | Remove location annotations from AST
+stripLoc :: Sugar -> Sugar
+stripLoc = cata s
+  where
+    s (LocSB _ le) = dislocate le
+    s e            = embed e
+
 -- | Convert a generic assignment to a top-level assignment.
 declToDef :: Located Decl -> Para Sugar
 declToDef ld | Decl x e <- dislocate ld = Def x e

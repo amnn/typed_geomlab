@@ -14,14 +14,15 @@ module SpecHelper
 import Prelude hiding (Foldable)
 import qualified Data.ByteString.Lazy.Char8 as BS
 import Control.Monad (unless)
-import Data.Functor.Foldable
 import Desugar (desugarExpr)
-import Expr
+import Expr hiding (stripLoc)
+import qualified Expr as E (stripLoc)
 import GLParser (parseExpr)
 import Infer (typeCheck)
 import Lexer
 import Location
-import Sugar
+import Sugar hiding (stripLoc)
+import qualified Sugar as S (stripLoc)
 import Test.Hspec
 import Test.HUnit (assertFailure)
 import Token
@@ -82,22 +83,10 @@ locScanTokens input = return (runAlex input loop)
               else do rest <- loop
                       return (l:rest)
 
-stripLocS :: Sugar -> Sugar
-stripLocS = cata s
-  where
-    s (LocSB _ le) = dislocate le
-    s e            = embed e
-
-stripLocE :: Expr -> Expr
-stripLocE = cata s
-  where
-    s (LocEB _ le) = dislocate le
-    s e            = embed e
-
 parse :: BS.ByteString -> Result [Para Sugar]
 parse input = return (runAlex input pAndSExpr)
   where
-    pAndSExpr = map (fmap stripLocS) <$> parseExpr
+    pAndSExpr = map (fmap S.stripLoc) <$> parseExpr
 
 locParse :: BS.ByteString -> Result [Para Sugar]
 locParse input = return (runAlex input parseExpr)
@@ -105,7 +94,7 @@ locParse input = return (runAlex input parseExpr)
 desugar :: BS.ByteString -> Result [Para Expr]
 desugar input = return (runAlex input pAndDExpr)
   where
-    pAndDExpr = map (fmap (stripLocE . desugarExpr)) <$> parseExpr
+    pAndDExpr = map (fmap (E.stripLoc . desugarExpr)) <$> parseExpr
 
 locDesugar :: BS.ByteString -> Result [Para Expr]
 locDesugar input = return (runAlex input pAndDExpr)

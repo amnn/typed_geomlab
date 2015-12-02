@@ -62,6 +62,13 @@ data ExprB a = LitEB (LitB a)
 instance EmbedsLit Expr where
   embedLit = LitE
 
+-- | Remove location annotations from AST
+stripLoc :: Expr -> Expr
+stripLoc = cata s
+  where
+    s (LocEB _ le) = dislocate le
+    s e            = embed e
+
 type instance Base Expr = ExprB
 instance Foldable Expr where
   project (LitE s)      = LitEB s
