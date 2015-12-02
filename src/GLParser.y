@@ -85,13 +85,13 @@ Id : ident { ident $1 }
 -- Expressions
 Expr ::                      { Located Sugar }
 Expr : Cond                  { $1 }
-     | let Decl in Expr      { reify "let expression" $ $1 *> declToLet $2 (reify "expression" $4) }
+     | let Decl in Expr      { reify "let expression" $ $1 *> declToLet $2 (reify "body" $4) }
      | function Formals Expr { $1 *> anonFn $2 $3 }
      | Cond '>>' Expr        { SeqS <@> $1 <*> $3 }
 
 ExprOrSect ::                      { Located Sugar }
 ExprOrSect : let Decl in Expr      { reify "let expression" $
-                                       $1 *> declToLet $2 (reify "expression" $4)
+                                       $1 *> declToLet $2 (reify "body" $4)
                                    }
 
            | function Formals Expr { $1 *> anonFn $2 $3 }
