@@ -16,7 +16,7 @@ data Located a = L Span a
 -- | A line and column, used for printing error messages.
 data Point     = P { line   :: !Int
                    , col    :: !Int
-                   } deriving (Eq, Show, Ord)
+                   } deriving (Eq, Ord)
 
 -- | A representation of a location in the source file, as a line and column
 -- (for errors) as well as an offset and width, for slicing from the input
@@ -26,7 +26,14 @@ data Span      = S { start  :: !Point
                    , width  :: !Int
                    }
                | Floating
-                 deriving (Eq, Show)
+                 deriving Eq
+
+instance Show Point where
+  show (P l c) = show l ++ ":" ++ show c
+
+instance Show Span where
+  show Floating  = "~~~"
+  show (S s o w) = "[" ++ show s ++ "]" ++ "+" ++ show o ++ "~" ++ show w
 
 fmtErr :: Show a => Located a -> String
 fmtErr (L (S (P l c) _ _) x) =
