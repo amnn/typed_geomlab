@@ -556,6 +556,12 @@ type InferM s = ReaderT (ScopedState s)
 typeCheck :: [Para Expr] -> [Para (Either TyError (Ty Id))]
 typeCheck ps = runST $ evalStateT (mapM tcPara ps) =<< initialDefs
   where
+    topCtx (LocE lbl le) act =
+      catchError act $ \e ->
+        throwError (CtxE lbl (le *> pure e))
+    topCtx _ _ =
+      error "topCtx: No location at top level."
+
     topScope im = runExceptT . flip runReaderT undefined $ do
       tyCtx <- liftST $ newArray_ 4
       gsRef <- newIRef $ GS {tyCtx, waitingToAdjust = [], nextTyVar = 0}
@@ -563,7 +569,7 @@ typeCheck ps = runST $ evalStateT (mapM tcPara ps) =<< initialDefs
 
     tcPara (Eval e) = fmap Eval . topScope $ do
       etr <- flip typeOf e =<< get
-      cycleFree etr
+      topCtx e $ cycleFree etr
       resolveTyRef etr
 
     tcPara (Def x e) = fmap (Def x) . topScope $ do
@@ -571,8 +577,9 @@ typeCheck ps = runST $ evalStateT (mapM tcPara ps) =<< initialDefs
         evr <- newVar
         modify (H.insert x evr)
         etr <- flip typeOf e =<< get
-        unify evr etr
-        cycleFree evr
+        topCtx e $ do
+          unify evr etr
+          cycleFree evr
         return evr
       generalise dtr
       resolveTyRef dtr

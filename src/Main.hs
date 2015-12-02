@@ -87,7 +87,7 @@ processArg fname = do
 
       -- Type checking
       when showType $ do
-        inFaint $ putStrLn "Type Checked\n"
+        inFaint $ putStrLn "Type Checked"
         let types = typeCheck expr
         mapM_ (disp raw) types
   where
