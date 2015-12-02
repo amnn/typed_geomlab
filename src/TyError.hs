@@ -30,7 +30,7 @@ printError fname input (CtxE root chain@(L rootSp _)) = do
          ]
   errHead rootSp; putStr "Error in the "; putStrLn root
   setSGR []; newLine
-  unwind chain
+  unwind True chain
   newLine
 
   where
@@ -83,9 +83,9 @@ printError fname input (CtxE root chain@(L rootSp _)) = do
     indentS n msg = putStr (replicate (4*n) ' ') >> putStrLn msg
     indentBS  msg = putStr "    " >> BS.putStrLn msg
 
-    unwind (L _ OccursE)                   = indentS 1 "Attempted to construct an infinite type!"
-    unwind (L _ (UnboundVarE x))           = indentS 1 $ "Unbound variable '" ++ x ++ "'."
-    unwind (L _ (UnificationE te ta ctx)) = do
+    unwind _ (L _ OccursE)                  = indentS 1 "Attempted to construct an infinite type!"
+    unwind _ (L _ (UnboundVarE x))          = indentS 1 $ "Unbound variable '" ++ x ++ "'."
+    unwind _ (L _ (UnificationE te ta ctx)) = do
       indentS 1 "Failed to unify types:"
       indentS 2 $ "Expected: " ++ show te
       indentS 2 $ "Actual:   " ++ show ta
@@ -97,18 +97,18 @@ printError fname input (CtxE root chain@(L rootSp _)) = do
           indentS 2 $ "Expected: " ++ show pte
           indentS 2 $ "Actual:   " ++ show pta
 
-    unwind (L sp (CtxE lbl (L sp' (CtxE lbl' le@(L sp'' _)))))
+    unwind _ (L sp (CtxE lbl (L sp' (CtxE lbl' le@(L sp'' _)))))
       | sp == sp' = do
-      unwind le
+      unwind False le
       newLine; setSGR [SetColor Foreground Dull Red]
       errHead sp''; mapM_ putStr ["In the ", lbl', " of the "]; putStrLn lbl
       setSGR []; newLine
       nest sp' sp''
 
-    unwind (L sp (CtxE _ le@(L sp' _))) | sp == sp' = unwind le
+    unwind False (L sp (CtxE _ le@(L sp' _))) | sp == sp' = unwind False le
 
-    unwind (L _  (CtxE lbl le@(L sp _))) = do
-      unwind le
+    unwind _ (L _  (CtxE lbl le@(L sp _))) = do
+      unwind False le
       newLine; setSGR [SetColor Foreground Dull Red]
       errHead sp; putStr "In the "; putStrLn lbl
       setSGR []; newLine
