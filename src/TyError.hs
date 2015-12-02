@@ -119,3 +119,4 @@ printError _ _ e = do
   putStrLn "An error was returned without a root location"
   putStrLn "Here it is anyway: "
   print e
+  putStrLn ""

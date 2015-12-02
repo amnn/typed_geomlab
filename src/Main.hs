@@ -14,29 +14,32 @@ import System.Console.ANSI
 import System.Environment
 import TyError
 
-data Opt = Opt { showRaw   :: !Bool
-               , showSugar :: !Bool
-               , showExpr  :: !Bool
-               , showLoc   :: !Bool
-               , showType  :: !Bool
+data Opt = Opt { showRaw      :: !Bool
+               , showSugar    :: !Bool
+               , showExpr     :: !Bool
+               , showLoc      :: !Bool
+               , showType     :: !Bool
+               , showRawError :: !Bool
                }
 
 defaultOpts :: Opt
-defaultOpts = Opt { showRaw   = False
-                  , showSugar = False
-                  , showExpr  = False
-                  , showLoc   = False
-                  , showType  = True
+defaultOpts = Opt { showRaw      = False
+                  , showSugar    = False
+                  , showExpr     = False
+                  , showLoc      = False
+                  , showType     = True
+                  , showRawError = False
                   }
 
 setOpt :: Bool -> Char -> StateT Opt IO ()
 setOpt b o = do
   case o of
-    'r' -> modify' $ \opt -> opt{showRaw   = b}
-    's' -> modify' $ \opt -> opt{showSugar = b}
-    'e' -> modify' $ \opt -> opt{showExpr  = b}
-    'l' -> modify' $ \opt -> opt{showLoc   = b}
-    't' -> modify' $ \opt -> opt{showType  = b}
+    'r' -> modify' $ \opt -> opt{showRaw      = b}
+    's' -> modify' $ \opt -> opt{showSugar    = b}
+    'e' -> modify' $ \opt -> opt{showExpr     = b}
+    'l' -> modify' $ \opt -> opt{showLoc      = b}
+    't' -> modify' $ \opt -> opt{showType     = b}
+    'E' -> modify' $ \opt -> opt{showRawError = b}
     _   -> return ()
 
 fmt :: [SGR] -> IO () -> StateT Opt IO ()
@@ -88,10 +91,17 @@ processArg fname = do
         let types = typeCheck expr
         mapM_ (disp raw) types
   where
+    err raw e = do
+      Opt{showRawError} <- get
+      liftIO $ printError fname raw e
+      when showRawError $ do
+        inFaint (putStrLn "Raw Error\n")
+        liftIO $ print e >> putStrLn ""
+
     disp _   (Def x (Right t)) = inGreen (putStrLn $ x ++ " :: " ++ show t)
-    disp raw (Def _ (Left e))  = liftIO $ printError fname raw e
+    disp raw (Def _ (Left e))  = err raw e
     disp _   (Eval  (Right t)) = inGreen (putStrLn $ show t)
-    disp raw (Eval  (Left e))  = liftIO $ printError fname raw e
+    disp raw (Eval  (Left e))  = err raw e
 
 main :: IO ()
 main = evalStateT (liftIO getArgs >>= mapM_ processArg) defaultOpts
