@@ -250,7 +250,7 @@ cycleFree tr = do
   StratTy{ty, newLevel} <- readIRef tr
   case ty of
     VarTB (FwdV t) -> cycleFree t
-    _ | Marked m <- newLevel -> throwError . OccursE =<< decycle m tr
+    _ | Marked _ <- newLevel -> throwError . OccursE =<< resolveTyRef tr
     _ -> do afterMarking 0 tr $ mapM_ cycleFree ty
 
 -- | Update the level of a type reference, or register the reference to have its
@@ -270,7 +270,7 @@ updateLevel lvl tr = do
       , length ty == 0 ->
         when (lvl < lvl') $ setLevel tr $ Set lvl
 
-    _ | Marked m         <- newLevel -> throwError . OccursE =<< decycle m tr
+    _ | Marked _         <- newLevel -> throwError . OccursE =<< resolveTyRef tr
     _ | Set lvl'@(Lvl _) <- newLevel -> do
         when (lvl < lvl') $ do
           when (lvl' == oldLevel) $ do
@@ -312,8 +312,8 @@ unify _tr _ur = do
           _ -> do
             [te, ta] <- mapM resolveTyRef [_tr, _ur]
             throwError $ UnificationE te ta Nothing
-      (Marked m, _) -> throwError . OccursE =<< decycle m _tr
-      (_, Marked m) -> throwError . OccursE =<< decycle m _ur
+      (Marked _, _) -> throwError . OccursE =<< resolveTyRef _tr
+      (_, Marked _) -> throwError . OccursE =<< resolveTyRef _ur
   where
     link vr wr = do
       modifyIRef wr $ \st -> st{ty = VarTB (FwdV vr)}
@@ -359,7 +359,7 @@ forceDelayedAdjustments = do
       _tr <- repr _tr
       StratTy{newLevel = mNLvl'} <- readIRef _tr
       case mNLvl' of
-        Marked m  -> throwError . OccursE =<< decycle m _tr
+        Marked _  -> throwError . OccursE =<< resolveTyRef _tr
         Set nLvl' -> do
           when (nLvl' > nLvl) (setLevel _tr $ Set nLvl)
           adjustTop ts _tr
@@ -483,50 +483,35 @@ typeOf gloDefs = check
       unify ltr ttr
       return ltr
 
--- | Convert a type reference into a type tree by chasing forwarding pointers.
+-- | Convert a type reference into a type tree by chasing forwarding pointers, and pruning
+-- cycles we may encounter to prevent infinite-depth trees.
 resolveTyRef :: MonadInfer m => TyRef (World m) -> m (Ty Id)
-resolveTyRef tr = do
-  StratTy{ty} <- readIRef =<< repr tr
-  case ty of
-    VarTB (FreeV n) -> return $ VarT n
-    VarTB (FwdV  _) -> error "resolveTyRef: forward pointer!"
-
-    BoolTB          -> return $ BoolT
-    NumTB           -> return $ NumT
-    StrTB           -> return $ StrT
-    AtomTB          -> return $ AtomT
-
-    RefTB  t        -> RefT  <$> resolveTyRef t
-    ListTB t        -> ListT <$> resolveTyRef t
-    HashTB k v      -> HashT <$> resolveTyRef k <*> resolveTyRef v
-    ArrTB as b      -> ArrT  <$> mapM resolveTyRef as <*> resolveTyRef b
-
--- | Take a possibly cyclic type (one that has failed the occurs check) and
--- convert it into a type with `*` variables in place of variables creating cycles.
-decycle :: MonadInfer m => Int -> TyRef (World m) -> m (Ty Id)
-decycle m = dc
+resolveTyRef _tr = do
+  StratTy{newLevel} <- readIRef =<< repr _tr
+  case newLevel of
+    Marked m -> resolve (m + 1) _tr
+    Set _    -> resolve 0       _tr
   where
-    m'     = m + 1
-    dc _tr = do
+    resolve m _tr = do
       _tr <- repr _tr
       StratTy{ty, newLevel} <- readIRef _tr
-      afterMarking m' _tr $
+      afterMarking m _tr $
         case newLevel of
-          Marked n | n >= m' -> return (VarT "*")
-          _                  -> recur ty
+          Marked n | n >= m -> return (VarT "*")
+          _                 -> recur m ty
 
-    recur (VarTB (FreeV n)) = return $ VarT n
-    recur (VarTB (FwdV  _)) = error "decycle: forward pointer!"
+    recur _ (VarTB (FreeV n)) = return $ VarT n
+    recur _ (VarTB (FwdV  _)) = error "resolveTyRef: forward pointer!"
 
-    recur BoolTB = return $ BoolT
-    recur NumTB  = return $ NumT
-    recur StrTB  = return $ StrT
-    recur AtomTB = return $ AtomT
+    recur _ BoolTB = return $ BoolT
+    recur _ NumTB  = return $ NumT
+    recur _ StrTB  = return $ StrT
+    recur _ AtomTB = return $ AtomT
 
-    recur (RefTB  t)   = RefT  <$> dc t
-    recur (ListTB t)   = ListT <$> dc t
-    recur (HashTB k v) = HashT <$> dc k <*> dc v
-    recur (ArrTB as b) = ArrT  <$> mapM dc as <*> dc b
+    recur m (RefTB  t)   = RefT  <$> resolve m t
+    recur m (ListTB t)   = ListT <$> resolve m t
+    recur m (HashTB k v) = HashT <$> resolve m k <*> resolve m v
+    recur m (ArrTB as b) = ArrT  <$> mapM (resolve m) as <*> resolve m b
 
 -- | Create a type reference at the "general" level, from a type tree.
 abstractTy :: MonadST m => Ty Id -> m (TyRef (World m))
