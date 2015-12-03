@@ -51,7 +51,7 @@ instance Show (Ty Id) where
   show (HashT k v) = "{" ++ show k ++ " => " ++ show v ++ "}"
   show (ArrT as b) = showFormals as ++ " -> " ++ show b
     where
-      showFormals [f]   = show f
+      showFormals [f]   = wrap f
       showFormals fs    = "(" ++  intercalate ", " (map show fs) ++ ")"
 
 wrap :: Ty Id -> String
