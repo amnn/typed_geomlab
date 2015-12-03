@@ -1,8 +1,10 @@
 {-# LANGUAGE ConstraintKinds
            , FlexibleContexts
            , NamedFieldPuns
+           , PackageImports
            , PatternGuards
-           , RankNTypes #-}
+           , RankNTypes
+           #-}
 
 module Infer where
 
@@ -55,11 +57,15 @@ data Level = Lvl Int | Gen deriving (Eq, Show, Ord)
 
 -- | Representation of variables. Each can either be a name, or a link to
 -- another type reference.
-data StratV  s = FreeV Id | FwdV (TyRef s) deriving Eq
+data StratV s = FreeV Id | FwdV (TyRef s) deriving Eq
+
+-- | Tag type for cycle detection (a's are marked as they are visited, if a
+-- marked object is visited again, then we have detected a cycle).
+data Marked a = Set a | Marked !Int deriving (Eq, Show)
 
 -- | Representation of types, annotated by their level.
 data StratTy s = StratTy { ty       :: TyB (StratV s) (TyRef s)
-                         , newLevel :: Maybe Level
+                         , newLevel :: !(Marked Level)
                          , oldLevel :: !Level
                          } deriving Eq
 
@@ -138,11 +144,11 @@ newTy :: MonadInfer m
 
 newTy t = do
   lvl <- getCurrLvl
-  newIRef $ StratTy { ty = t, newLevel = Just (Lvl lvl), oldLevel = Lvl lvl }
+  newIRef $ StratTy { ty = t, newLevel = Set (Lvl lvl), oldLevel = Lvl lvl }
 
 -- | Create a new type at the generic level, from the structure provided.
 genTy :: MonadST m => TyB (StratV (World m)) (TyRef (World m)) -> m (TyRef (World m))
-genTy t = newIRef $ StratTy { ty = t, newLevel = Just Gen, oldLevel = Gen }
+genTy t = newIRef $ StratTy { ty = t, newLevel = Set Gen, oldLevel = Gen }
 
 -- | Create a fresh type variable at the current level.
 newVar :: MonadInfer m => m (TyRef (World m))
@@ -204,21 +210,30 @@ repr tr = do
 -- value, so that is returned so that it may be restored later. If a marked
 -- reference is visited more than once, this indicates a cycle has been
 -- detected.
-markTy :: MonadInfer m => TyRef (World m) -> m Level
-markTy tr = do
-  sty@StratTy{newLevel = Just lvl} <- readIRef tr
-  writeIRef tr sty {newLevel = Nothing}
-  return lvl
+markTy :: MonadInfer m => Int -> TyRef (World m) -> m (Marked Level)
+markTy i tr = do
+  sty <- readIRef tr
+  writeIRef tr $ sty{newLevel = Marked i}
+  return $ newLevel sty
 
 -- | Set the level of a type reference.
-setLevel :: MonadInfer m => TyRef (World m) -> Level -> m ()
-setLevel tr lvl = do
-  modifyIRef tr $ \st -> st{newLevel = Just lvl}
+setLevel :: MonadInfer m => TyRef (World m) -> Marked Level -> m ()
+setLevel tr mLvl = do
+  modifyIRef tr $ \st -> st{newLevel = mLvl}
+
+-- | Mark a reference, then perform an action and immediately unmark said
+-- reference (Well scoped marking during traversals).
+afterMarking :: MonadInfer m => Int -> TyRef (World m) -> m a ->  m a
+afterMarking i tr act = do
+  mLvl <- markTy i tr
+  ret  <- act
+  setLevel tr mLvl
+  return ret
 
 -- | Get the level of a type reference.
 getLevel :: MonadInfer m => TyRef (World m) -> m Level
 getLevel tr = do
-  StratTy{newLevel = Just lvl} <- readIRef tr
+  StratTy{newLevel = Set lvl} <- readIRef tr
   return lvl
 
 -- | Set all level values of a type as the same. When this is done to non-leaf
@@ -226,7 +241,7 @@ getLevel tr = do
 -- accounted for.
 unifyLevels :: MonadInfer m => TyRef (World m) -> Level -> m ()
 unifyLevels tr lvl =
-  modifyIRef tr $ \st -> st{newLevel = Just lvl, oldLevel = lvl}
+  modifyIRef tr $ \st -> st{newLevel = Set lvl, oldLevel = lvl}
 
 -- | Check whether a type is free of all cycles. This function is only used at
 -- the top-level.
@@ -235,10 +250,8 @@ cycleFree tr = do
   StratTy{ty, newLevel} <- readIRef tr
   case ty of
     VarTB (FwdV t) -> cycleFree t
-    _ | Nothing <- newLevel -> throwError OccursE
-    _ -> do lvl <- markTy tr
-            mapM_ cycleFree ty
-            setLevel tr lvl
+    _ | Marked m <- newLevel -> throwError . OccursE =<< decycle m tr
+    _ -> do afterMarking 0 tr $ mapM_ cycleFree ty
 
 -- | Update the level of a type reference, or register the reference to have its
 -- level updated eventually. Level changes are made in response to unification:
@@ -250,19 +263,19 @@ updateLevel lvl tr = do
   StratTy{ty, newLevel, oldLevel} <- readIRef tr
   case ty of
     VarTB (FreeV _)
-      | Just lvl'@(Lvl _) <- newLevel ->
-        when (lvl < lvl') $ setLevel tr lvl
+      | Set lvl'@(Lvl _) <- newLevel ->
+        when (lvl < lvl') $ setLevel tr $ Set lvl
 
-    _ | Just lvl'@(Lvl _) <- newLevel
+    _ | Set lvl'@(Lvl _) <- newLevel
       , length ty == 0 ->
-        when (lvl < lvl') $ setLevel tr lvl
+        when (lvl < lvl') $ setLevel tr $ Set lvl
 
-    _ | Nothing           <- newLevel -> throwError OccursE
-    _ | Just lvl'@(Lvl _) <- newLevel -> do
+    _ | Marked m         <- newLevel -> throwError . OccursE =<< decycle m tr
+    _ | Set lvl'@(Lvl _) <- newLevel -> do
         when (lvl < lvl') $ do
           when (lvl' == oldLevel) $ do
             delayLevelUpdate tr
-          setLevel tr lvl
+          setLevel tr $ Set lvl
         return ()
 
     _ -> error "updateLevel: cannot update level"
@@ -284,7 +297,7 @@ unify _tr _ur = do
     StratTy{ty = tyT, newLevel = lvlT} <- readIRef _tr
     StratTy{ty = tyU, newLevel = lvlU} <- readIRef _ur
     case (lvlT, lvlU) of
-      (Just lt, Just lu) ->
+      (Set lt, Set lu) ->
         case (tyT, tyU) of
           (VarTB _, VarTB _)
             | lt > lu           -> link _tr _ur
@@ -293,13 +306,14 @@ unify _tr _ur = do
           (_, VarTB _)          -> updateLevel lu _tr >> link _tr _ur
           _ | tyT `shapeEq` tyU -> do
             let minLvl = lt `min` lu
-            mapM_ markTy [_tr, _ur]
+            mapM_ (markTy 0) [_tr, _ur]
             unifySub minLvl tyT tyU
-            mapM_ (flip setLevel minLvl) [_tr, _ur]
+            mapM_ (flip setLevel $ Set minLvl) [_tr, _ur]
           _ -> do
             [te, ta] <- mapM resolveTyRef [_tr, _ur]
             throwError $ UnificationE te ta Nothing
-      _ -> throwError OccursE
+      (Marked m, _) -> throwError . OccursE =<< decycle m _tr
+      (_, Marked m) -> throwError . OccursE =<< decycle m _ur
   where
     link vr wr = do
       modifyIRef wr $ \st -> st{ty = VarTB (FwdV vr)}
@@ -331,12 +345,12 @@ forceDelayedAdjustments = do
   where
     adjustTop ts tr = do
       lvl <- Lvl <$> asks lvl
-      StratTy{ty, newLevel = Just nLvl, oldLevel = oLvl} <- readIRef tr
+      StratTy{ty, newLevel = Set nLvl, oldLevel = oLvl} <- readIRef tr
       case ty of
         _ | oLvl <= lvl  -> return (tr:ts)
         _ | oLvl == nLvl -> return ts
         _ -> do
-          mLvl <- markTy tr
+          Set mLvl <- markTy 0 tr
           ts'  <- foldM (adjustRec nLvl) ts ty
           unifyLevels tr mLvl
           return ts'
@@ -345,9 +359,9 @@ forceDelayedAdjustments = do
       _tr <- repr _tr
       StratTy{newLevel = mNLvl'} <- readIRef _tr
       case mNLvl' of
-        Nothing    -> throwError OccursE
-        Just nLvl' -> do
-          when (nLvl' > nLvl) (setLevel _tr nLvl)
+        Marked m  -> throwError . OccursE =<< decycle m _tr
+        Set nLvl' -> do
+          when (nLvl' > nLvl) (setLevel _tr $ Set nLvl)
           adjustTop ts _tr
 
 -- | Generalisation involves universally quantifying variables that are scoped
@@ -360,10 +374,10 @@ generalise tr = do
     gen _ur = do
       _ur <- repr _ur
       lvl <- Lvl <$> asks lvl
-      StratTy{ty, newLevel = Just l} <- readIRef _ur
+      StratTy{ty, newLevel = Set l} <- readIRef _ur
       when (l > lvl) $
         case ty of
-          VarTB (FreeV _)    -> setLevel _ur Gen
+          VarTB (FreeV _)    -> setLevel _ur $ Set Gen
           _ | length ty == 0 -> return ()
             | otherwise -> do
             reps <- mapM repr ty
@@ -379,7 +393,7 @@ instantiate :: MonadInfer m => TyRef (World m) -> m (TyRef (World m))
 instantiate tRef = evalStateT (inst tRef) H.empty
   where
     inst tr = do
-      StratTy{ty, newLevel = Just lvl} <- readIRef tr
+      StratTy{ty, newLevel = Set lvl} <- readIRef tr
       case ty of
         VarTB (FreeV n) | Gen <- lvl -> do
           subst <- get
@@ -486,6 +500,33 @@ resolveTyRef tr = do
     ListTB t        -> ListT <$> resolveTyRef t
     HashTB k v      -> HashT <$> resolveTyRef k <*> resolveTyRef v
     ArrTB as b      -> ArrT  <$> mapM resolveTyRef as <*> resolveTyRef b
+
+-- | Take a possibly cyclic type (one that has failed the occurs check) and
+-- convert it into a type with `*` variables in place of variables creating cycles.
+decycle :: MonadInfer m => Int -> TyRef (World m) -> m (Ty Id)
+decycle m = dc
+  where
+    m'     = m + 1
+    dc _tr = do
+      _tr <- repr _tr
+      StratTy{ty, newLevel} <- readIRef _tr
+      afterMarking m' _tr $
+        case newLevel of
+          Marked n | n >= m' -> return (VarT "*")
+          _                  -> recur ty
+
+    recur (VarTB (FreeV n)) = return $ VarT n
+    recur (VarTB (FwdV  _)) = error "decycle: forward pointer!"
+
+    recur BoolTB = return $ BoolT
+    recur NumTB  = return $ NumT
+    recur StrTB  = return $ StrT
+    recur AtomTB = return $ AtomT
+
+    recur (RefTB  t)   = RefT  <$> dc t
+    recur (ListTB t)   = ListT <$> dc t
+    recur (HashTB k v) = HashT <$> dc k <*> dc v
+    recur (ArrTB as b) = ArrT  <$> mapM dc as <*> dc b
 
 -- | Create a type reference at the "general" level, from a type tree.
 abstractTy :: MonadST m => Ty Id -> m (TyRef (World m))

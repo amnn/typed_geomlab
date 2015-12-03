@@ -14,9 +14,11 @@ data TyError = UnboundVarE Id
             -- ^ Could not unify two types. Optionally, the error occurred in
             -- the unification of larger types which may also be given.
 
-             | OccursE
+             | OccursE (Ty Id)
             -- ^ When unifying a variable with a type, we found the variable
-            -- within the type (A cycle was detected in the occurs check).
+            -- within the type (A cycle was detected in the occurs check). The
+            -- type containing the cycle is given with cyclic components
+            -- replaced with a special '*' variable.
              | CtxE String (Located TyError)
             -- ^ Adds context to an error in the form of a label and a location.
                deriving (Eq, Show)
@@ -83,8 +85,10 @@ printError fname input (CtxE root chain@(L rootSp _)) = do
     indentS n msg = putStr (replicate (4*n) ' ') >> putStrLn msg
     indentBS  msg = putStr "    " >> BS.putStrLn msg
 
-    unwind _ (L _ OccursE)                  = indentS 1 "Attempted to construct an infinite type!"
     unwind _ (L _ (UnboundVarE x))          = indentS 1 $ "Unbound variable '" ++ x ++ "'."
+    unwind _ (L _ (OccursE t))              = do
+      indentS 1 "Attempted to construct an infinite type!"
+      indentS 2 $ show t
     unwind _ (L _ (UnificationE te ta ctx)) = do
       indentS 1 "Failed to unify types:"
       indentS 2 $ "Expected: " ++ show te

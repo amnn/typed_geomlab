@@ -20,5 +20,5 @@ define foo([1])     = true
      | foo(["foo"]) = false;
 
 { Infinite Types }
-define f(y) = f(f);
 define k(x) = k;
+define f(y) = f(f);
