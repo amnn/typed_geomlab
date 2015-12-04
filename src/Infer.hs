@@ -175,10 +175,11 @@ printTyRef = p 0
       StratTy{ty, newLevel, oldLevel} <- readIRef tr
       prn $ concat ["{", show newLevel, ", ", show oldLevel, "}"]
       case ty of
-        BoolTB -> prn "bool"
-        NumTB  -> prn "num"
-        StrTB  -> prn "str"
-        AtomTB -> prn "atom"
+        BrokenTB -> prn "broken"
+        BoolTB   -> prn "bool"
+        NumTB    -> prn "num"
+        StrTB    -> prn "str"
+        AtomTB   -> prn "atom"
 
         VarTB (FreeV n) -> prn $ "var: " ++ n
         VarTB (FwdV f)  -> prn "var: ~~>" >> p (off + 2) f
@@ -416,8 +417,12 @@ typeOf gloDefs = check
     check (VarE ix) = getLocalTy ix >>= instantiate
 
     check (FreeE v)
-      | Just tr <- H.lookup v gloDefs = instantiate tr
-      | otherwise                     = throwError $ UnboundVarE v
+      | Just tr <- H.lookup v gloDefs = do
+        StratTy {ty} <- readIRef =<< repr tr
+        case ty of
+          BrokenTB -> throwError (DeferE v)
+          _        -> instantiate tr
+      | otherwise = throwError $ UnboundVarE v
 
     check (IfE c t e) = do
       [ctr, ttr, tte] <- mapM check [c, t, e]
@@ -503,10 +508,11 @@ resolveTyRef _tr = do
     recur _ (VarTB (FreeV n)) = return $ VarT n
     recur _ (VarTB (FwdV  _)) = error "resolveTyRef: forward pointer!"
 
-    recur _ BoolTB = return $ BoolT
-    recur _ NumTB  = return $ NumT
-    recur _ StrTB  = return $ StrT
-    recur _ AtomTB = return $ AtomT
+    recur _ BrokenTB = return $ BrokenT
+    recur _ BoolTB   = return $ BoolT
+    recur _ NumTB    = return $ NumT
+    recur _ StrTB    = return $ StrT
+    recur _ AtomTB   = return $ AtomT
 
     recur m (RefTB  t)   = RefT  <$> resolve m t
     recur m (ListTB t)   = ListT <$> resolve m t
@@ -526,6 +532,7 @@ abstractTy ty = evalStateT (absT ty) H.empty
           put (H.insert n vr subst)
           return vr
 
+    absT BrokenT     = genTy $ BrokenTB
     absT BoolT       = genTy $ BoolTB
     absT NumT        = genTy $ NumTB
     absT StrT        = genTy $ StrTB
@@ -593,12 +600,19 @@ typeCheck ps = runST $ evalStateT (mapM tcPara ps) =<< initialDefs
       gsRef <- newIRef $ GS {tyCtx, waitingToAdjust = [], nextTyVar = 0}
       local (const $ SS {gsRef, lvl = 0}) im
 
-    tcPara (Eval e) = fmap Eval . topScope $ do
+    guardTy x im = catchError im $ \e -> do
+      modify . H.insert x =<< genTy BrokenTB
+      throwError e
+
+    tcPara (Eval e) = fmap Eval
+                    . topScope $ do
       etr <- flip typeOf e =<< get
       topCtx e $ cycleFree etr
       resolveTyRef etr
 
-    tcPara (Def x e) = fmap (Def x) . topScope $ do
+    tcPara (Def x e) = fmap (Def x)
+                     . topScope
+                     . guardTy x $ do
       dtr <- newScope $ do
         evr <- newVar
         modify (H.insert x evr)

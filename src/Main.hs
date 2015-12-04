@@ -12,7 +12,9 @@ import Sugar hiding (stripLoc)
 import qualified Sugar as S (stripLoc)
 import System.Console.ANSI
 import System.Environment
+import Token
 import TyError
+import Type
 
 data Opt = Opt { showRaw      :: !Bool
                , showSugar    :: !Bool
@@ -89,19 +91,30 @@ processArg fname = do
       when showType $ do
         inFaint $ putStrLn "Type Checked"
         let types = typeCheck expr
-        mapM_ (disp raw) types
+        defers <- foldM (disp raw) 0 types
+        when (defers > 0) $
+          case defers of
+            1 -> inFaint $ putStrLn (deferMsgBegin ++ "1 statement" ++ deferMsgEnd)
+            d -> inFaint $ putStrLn (deferMsgBegin ++ show d ++ "statements" ++ deferMsgEnd)
   where
-    err raw e = do
+    deferMsgBegin = "Type checking has been deferred for "
+    deferMsgEnd   = ", due to earlier errors."
+
+    err raw d e
+      | isDeferral e = return (d+1)
+      | otherwise    = liftIO $ printError fname raw e >> return d
+
+    rawErr e = do
       Opt{showRawError} <- get
-      liftIO $ printError fname raw e
       when showRawError $ do
         inFaint (putStrLn "Raw Error\n")
         liftIO $ print e >> putStrLn ""
 
-    disp _   (Def x (Right t)) = inGreen (putStrLn $ x ++ " :: " ++ show t)
-    disp raw (Def _ (Left e))  = err raw e
-    disp _   (Eval  (Right t)) = inGreen (putStrLn $ show t)
-    disp raw (Eval  (Left e))  = err raw e
+    disp :: BS.ByteString -> Int -> Para (Either TyError (Ty Id)) -> StateT Opt IO Int
+    disp _   d (Def x (Right t)) = inGreen (putStrLn $ x ++ " :: " ++ show t) >> return d
+    disp _   d (Eval  (Right t)) = inGreen (putStrLn $ show t) >> return d
+    disp raw d (Def _ (Left e))  = rawErr e >> err raw d e
+    disp raw d (Eval  (Left e))  = rawErr e >> err raw d e
 
 main :: IO ()
 main = evalStateT (liftIO getArgs >>= mapM_ processArg) defaultOpts

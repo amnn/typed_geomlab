@@ -18,18 +18,19 @@ import Data.Traversable (mapAccumL)
 import Structure (shapeEq)
 import Token (Id)
 
-data Ty v    = BoolT | NumT | StrT | AtomT | VarT v
+data Ty v    = BrokenT | BoolT | NumT | StrT | AtomT | VarT v
              | RefT (Ty v) | ListT (Ty v) | HashT (Ty v) (Ty v)
              | ArrT [Ty v] (Ty v)
                deriving Eq
 
-data TyB v a = BoolTB | NumTB | StrTB | AtomTB | VarTB v
+data TyB v a = BrokenTB | BoolTB | NumTB | StrTB | AtomTB | VarTB v
              | RefTB a | ListTB a | HashTB a a
              | ArrTB [a] a
                deriving (Eq, Show, P.Foldable, Functor, Traversable)
 
 type instance Base (Ty v) = TyB v
 instance Foldable (Ty v) where
+  project BrokenT     = BrokenTB
   project BoolT       = BoolTB
   project NumT        = NumTB
   project StrT        = StrTB
@@ -41,6 +42,7 @@ instance Foldable (Ty v) where
   project (ArrT as a) = ArrTB as a
 
 instance Show (Ty Id) where
+  show BrokenT     = "broken"
   show BoolT       = "bool"
   show NumT        = "num"
   show StrT        = "str"

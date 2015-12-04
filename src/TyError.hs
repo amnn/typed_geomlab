@@ -10,6 +10,11 @@ import Type
 data TyError = UnboundVarE Id
             -- ^ A free variable was found for which no type exists
             -- (i.e. undefined variable).
+
+             | DeferE Id
+            -- ^ When typechecking this expression a free variable was found
+            -- whose type was broken (an error was found whilst checking it).
+
              | UnificationE (Ty Id) (Ty Id) (Maybe (Ty Id, Ty Id))
             -- ^ Could not unify two types. Optionally, the error occurred in
             -- the unification of larger types which may also be given.
@@ -19,9 +24,16 @@ data TyError = UnboundVarE Id
             -- within the type (A cycle was detected in the occurs check). The
             -- type containing the cycle is given with cyclic components
             -- replaced with a special '*' variable.
+
              | CtxE String (Located TyError)
             -- ^ Adds context to an error in the form of a label and a location.
                deriving (Eq, Show)
+
+-- | Check whether the root error is a deferral.
+isDeferral :: TyError -> Bool
+isDeferral (DeferE _)  = True
+isDeferral (CtxE _ le) = isDeferral (dislocate le)
+isDeferral _           = False
 
 printError :: FilePath -> BS.ByteString -> TyError -> IO ()
 printError fname input (CtxE root chain@(L rootSp _)) = do
@@ -86,6 +98,8 @@ printError fname input (CtxE root chain@(L rootSp _)) = do
     indentBS  msg = putStr "    " >> BS.putStrLn msg
 
     unwind _ (L _ (UnboundVarE x))          = indentS 1 $ "Unbound variable '" ++ x ++ "'."
+    unwind _ (L _ (DeferE x))               = do
+      indentS 1 $ "Deferred because of an error found whilst checking '" ++ x ++ "'."
     unwind _ (L _ (OccursE t))              = do
       indentS 1 "Attempted to construct an infinite type!"
       indentS 2 $ show t
