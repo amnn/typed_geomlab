@@ -22,3 +22,4 @@ define foo([1])     = true
 { Infinite Types }
 define k(x) = k;
 define f(y) = f(f);
+define g(x) = let p(x, y) = function (f) f(x, y) in p(g, g);

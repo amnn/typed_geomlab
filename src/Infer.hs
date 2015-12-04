@@ -300,7 +300,7 @@ unify _tr _ur = do
       (Set lt, Set lu) ->
         case (tyT, tyU) of
           (VarTB _, VarTB _)
-            | lt > lu           -> link _tr _ur
+            | lt < lu           -> link _tr _ur
             | otherwise         -> link _ur _tr
           (VarTB _, _)          -> updateLevel lt _ur >> link _ur _tr
           (_, VarTB _)          -> updateLevel lu _tr >> link _tr _ur
