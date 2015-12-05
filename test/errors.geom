@@ -23,3 +23,6 @@ define foo([1])     = true
 define k(x) = k;
 define f(y) = f(f);
 define g(x) = let p(x, y) = function (f) f(x, y) in p(g, g);
+
+define h(x) = f(x);
+define i(x) = k(x);

@@ -91,14 +91,15 @@ processArg fname = do
       when showType $ do
         inFaint $ putStrLn "Type Checked"
         let types = typeCheck expr
-        defers <- foldM (disp raw) 0 types
-        when (defers > 0) $
-          case defers of
-            1 -> inFaint $ putStrLn (deferMsgBegin ++ "1 statement" ++ deferMsgEnd)
-            d -> inFaint $ putStrLn (deferMsgBegin ++ show d ++ "statements" ++ deferMsgEnd)
+        reportDefer =<< foldM (disp raw) 0 types
   where
-    deferMsgBegin = "Type checking has been deferred for "
-    deferMsgEnd   = ", due to earlier errors."
+    reportDefer d =
+        when (d > 0) $
+          inFaint . putStrLn $ "Type checking has been deferred for "
+                            ++ show d ++ pluralize d " statement"
+                            ++ ", due to earlier errors."
+    pluralize 1 s = s
+    pluralize _ s = s ++ "s"
 
     err raw d e
       | isDeferral e = return (d+1)
