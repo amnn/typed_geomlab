@@ -32,7 +32,7 @@ import Type
 
 type GSRef  s = STRef s (GlobalState s)
 type TyRef  s = STRef s (StratTy s)
-type GloDef s = H.Map Id (TyRef s)
+type GloDef s = H.Map Id (Maybe (TyRef s))
 
 -- | This state is held in a reference that is available from anywhere in the
 -- type checker. It holds the list of currently bound variables, a list of type
@@ -175,7 +175,6 @@ printTyRef = p 0
       StratTy{ty, newLevel, oldLevel} <- readIRef tr
       prn $ concat ["{", show newLevel, ", ", show oldLevel, "}"]
       case ty of
-        BrokenTB -> prn "broken"
         BoolTB   -> prn "bool"
         NumTB    -> prn "num"
         StrTB    -> prn "str"
@@ -417,11 +416,10 @@ typeOf gloDefs = check
     check (VarE ix) = getLocalTy ix >>= instantiate
 
     check (FreeE v)
-      | Just tr <- H.lookup v gloDefs = do
-        StratTy {ty} <- readIRef =<< repr tr
-        case ty of
-          BrokenTB -> throwError (DeferE v)
-          _        -> instantiate tr
+      | Just trm <- H.lookup v gloDefs =
+        case trm of
+          Nothing -> throwError (DeferE v)
+          Just tr -> instantiate tr
       | otherwise = throwError $ UnboundVarE v
 
     check (IfE c t e) = do
@@ -508,7 +506,6 @@ resolveTyRef _tr = do
     recur _ (VarTB (FreeV n)) = return $ VarT n
     recur _ (VarTB (FwdV  _)) = error "resolveTyRef: forward pointer!"
 
-    recur _ BrokenTB = return $ BrokenT
     recur _ BoolTB   = return $ BoolT
     recur _ NumTB    = return $ NumT
     recur _ StrTB    = return $ StrT
@@ -532,7 +529,6 @@ abstractTy ty = evalStateT (absT ty) H.empty
           put (H.insert n vr subst)
           return vr
 
-    absT BrokenT     = genTy $ BrokenTB
     absT BoolT       = genTy $ BoolTB
     absT NumT        = genTy $ NumTB
     absT StrT        = genTy $ StrTB
@@ -554,7 +550,7 @@ abstractTy ty = evalStateT (absT ty) H.empty
 initialDefs :: MonadST m => m (GloDef (World m))
 initialDefs = H.fromList <$> mapM absDef ts
   where
-    absDef (n, ty) = do { tr <- abstractTy ty; return (n, tr) }
+    absDef (n, ty) = do { tr <- abstractTy ty; return (n, Just tr) }
     numBOp i = (i, ArrT [NumT, NumT] NumT)
     numMOp i = (i, ArrT [NumT] NumT)
     relBOp i = (i, ArrT [VarT "a", VarT "a"] BoolT)
@@ -601,7 +597,7 @@ typeCheck ps = runST $ evalStateT (mapM tcPara ps) =<< initialDefs
       local (const $ SS {gsRef, lvl = 0}) im
 
     guardTy x im = catchError im $ \e -> do
-      modify . H.insert x =<< genTy BrokenTB
+      modify (H.insert x Nothing)
       throwError e
 
     tcPara (Eval e) = fmap Eval
@@ -615,7 +611,7 @@ typeCheck ps = runST $ evalStateT (mapM tcPara ps) =<< initialDefs
                      . guardTy x $ do
       dtr <- newScope $ do
         evr <- newVar
-        modify (H.insert x evr)
+        modify (H.insert x (Just evr))
         etr <- flip typeOf e =<< get
         topCtx e $ do
           unify evr etr
