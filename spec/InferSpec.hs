@@ -94,9 +94,3 @@ spec = do
     , eval $ ArrT [ListT NumT] (ListT NumT)
     , eval $ ArrT [ListT AtomT] (ListT AtomT)
     ]
-
-  typeCheckFile "test/gen_sym.geom" $
-    [ def "labcount" $ RefT NumT
-    , def "label" $ ArrT [] NumT
-    , eval $ NumT
-    ]

@@ -183,9 +183,7 @@ printTyRef = p 0
         VarTB (FreeV n) -> prn $ "var: " ++ n
         VarTB (FwdV f)  -> prn "var: ~~>" >> p (off + 2) f
 
-        RefTB  t   -> prn "ref: "  >> indent t
         ListTB t   -> prn "list: " >> indent t
-        HashTB k v -> prn "hash: " >> indent k >> prn "==>" >> indent v
         ArrTB as r -> do
           prn "fn: "
           forM_ as $ \a -> indent a >> prn "---"
@@ -511,9 +509,7 @@ resolveTyRef _tr = do
     recur _ StrTB    = return $ StrT
     recur _ AtomTB   = return $ AtomT
 
-    recur m (RefTB  t)   = RefT  <$> resolve m t
     recur m (ListTB t)   = ListT <$> resolve m t
-    recur m (HashTB k v) = HashT <$> resolve m k <*> resolve m v
     recur m (ArrTB as b) = ArrT  <$> mapM (resolve m) as <*> resolve m b
 
 -- | Create a type reference at the "general" level, from a type tree.
@@ -533,13 +529,7 @@ abstractTy ty = evalStateT (absT ty) H.empty
     absT NumT        = genTy $ NumTB
     absT StrT        = genTy $ StrTB
     absT AtomT       = genTy $ AtomTB
-    absT (RefT  t)   = absT t >>= genTy . RefTB
     absT (ListT t)   = absT t >>= genTy . ListTB
-
-    absT (HashT k v) = do
-      ktr <- absT k
-      vtr <- absT v
-      genTy (HashTB ktr vtr)
 
     absT (ArrT as b) = do
       atrs <- mapM absT as
@@ -561,13 +551,6 @@ initialDefs = H.fromList <$> mapM absDef ts
          , (":",       ArrT [VarT "a", ListT (VarT "a")] (ListT (VarT "a")))
          , ("true",    BoolT)
          , ("false",   BoolT)
-         , ("_new",    ArrT [VarT "a"] (RefT (VarT "a")))
-         , ("_get",    ArrT [RefT (VarT "a")] (VarT "a"))
-         , ("_set",    ArrT [RefT (VarT "a"), VarT "a"] (VarT "a"))
-         , ("_hash",   ArrT [] (HashT (VarT "k") (VarT "v")))
-         , ("_lookup", ArrT [HashT (VarT "k") (VarT "v"), VarT "k"] (VarT "v"))
-         , ("_update", ArrT [HashT (VarT "k") (VarT "v"), VarT "k", VarT "v"] (VarT "v"))
-         , ("_syntax", HashT AtomT (VarT "v"))
          , ("_debug",  ArrT [] BoolT)
          , ("_print",  ArrT [StrT] (ListT (VarT "a")))
          ]
