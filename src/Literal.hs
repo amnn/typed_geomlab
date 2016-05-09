@@ -8,6 +8,7 @@ import Token (Id)
 -- AST.
 data LitB a = NumB Double
             | StrB String
+            | BoolB Bool
             | NilB
             | AtomB Id
             | ConsB a a
@@ -30,6 +31,9 @@ numB = embedLit . NumB
 
 strB :: EmbedsLit a => String -> a
 strB = embedLit . StrB
+
+boolB :: EmbedsLit a => Bool -> a
+boolB = embedLit . BoolB
 
 nilB :: EmbedsLit a => a
 nilB = embedLit NilB

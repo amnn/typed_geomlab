@@ -474,6 +474,7 @@ typeOf gloDefs = check
 
     checkLit _ (NumB _)    = newTy NumTB
     checkLit _ (StrB _)    = newTy StrTB
+    checkLit _ (BoolB _)   = newTy BoolTB
     checkLit _ (AtomB _)   = newTy AtomTB
     checkLit _ NilB        = newVar >>= newTy . ListTB
     checkLit f (ConsB h t) = do
