@@ -71,7 +71,6 @@ spec = do
                             , ( ValPB (ConsB () ())
                               , AppE (VarE 5) [VarE 2, AppE (FreeE "_mapa") [VarE 5, VarE 1, VarE 3]]
                               )
-                            , ( VarPB "_", FailE)
                             ]))
 
     , Def "_range" (FnE 2 (CaseE (AppE (FreeE ">") [VarE 2,VarE 1])
@@ -114,10 +113,8 @@ spec = do
                                                           , (ValPB (BoolB False), VarE 5)
                                                           ]
                                                       )
-                                                    , ( VarPB "_", FallThroughE)
                                                     ]
                                                 )
-                                              , ( VarPB "_", FallThroughE)
                                               ]
                                           )
                                         , ( VarPB "_", VarE 2)
@@ -142,10 +139,8 @@ spec = do
                                        , VarE 5
                                        ]
                                    )
-                                 , ( VarPB "_", FallThroughE)
                                  ]
                              )
-                           , ( VarPB "_", FallThroughE)
                            ]
                        )
                      , ( VarPB "_", VarE 2)
@@ -169,7 +164,6 @@ spec = do
                         , ( ValPB (ConsB () ())
                           , AppE (VarE 5) [VarE 2, AppE (FreeE "foldr") [VarE 5, VarE 4, VarE 1]]
                           )
-                        , (VarPB "_", FailE)
                         ]))
 
     , Def "foldl" (FnE 3
@@ -178,7 +172,6 @@ spec = do
                        , ( ValPB (ConsB () ())
                          , AppE (FreeE "foldl") [VarE 5, AppE (VarE 5) [VarE 4, VarE 2], VarE 1]
                          )
-                       , (VarPB "_",FailE)
                        ]))
 
     , Def "map" (FnE 2

@@ -1,9 +1,12 @@
+{-# LANGUAGE TupleSections #-}
 module Desugar where
 
+import Control.Applicative ((<|>))
 import Data.Function (on)
 import Data.Functor.Foldable
 import qualified Data.HashMap as H
 import Data.List (groupBy, sortBy)
+import Data.Maybe (catMaybes)
 import Data.Ord (comparing)
 import Expr
 import Literal
@@ -11,19 +14,19 @@ import Patt
 import Sugar
 import Token (Id)
 
--- | A floating expression fragment, waiting to be placed within a particular
--- scope.
-type IxExpr = Int
-           -- ^ The level at which this floating expression is being inserted.
-           -> H.Map Id Int
-           -- ^ A mapping from the identifiers of currently bound variables to
-           -- the levels in the AST they were bound at.
-           -> Expr
+-- | A floating @ a @ term, containing de Bruijn indices, waiting to be placed
+-- within a particular scope.
+type Ix a = Int
+         -- ^ The level at which this floating term is being inserted.
+         -> H.Map Id Int
+         -- ^ A mapping from the identifiers of currently bound variables to the
+         -- levels in the AST they were bound at.
+         -> a
 
 desugarExpr :: Sugar -> Expr
 desugarExpr s = cata d s 0 H.empty
   where
-    d :: Base Sugar IxExpr -> IxExpr
+    d :: Base Sugar (Ix Expr)-> Ix Expr
     d (VarSB x)         = var x
     d (AppSB x es)      = apply x es
     d (RangeSB f t)     = apply "_range" [f, t]
@@ -38,22 +41,22 @@ desugarExpr s = cata d s 0 H.empty
 
 -- | Convert an expression with floating children into a floating expression
 -- itself.
-embedIx :: Base Expr IxExpr -> IxExpr
+embedIx :: Base Expr (Ix Expr) -> Ix Expr
 embedIx e l vs = embed $ (\ix -> ix l vs) <$> e
 
 -- | Close over an expression with no dangling bound variables.
-close :: Expr -> IxExpr
+close :: a -> Ix a
 close e _ _ = e
 
 -- | Creating a floating expression that will reference a variable introduced at
 -- level @ l' @ when reified.
-local :: Int -> IxExpr
+local :: Int -> Ix Expr
 local l' l _ = VarE (l - l')
 
 -- | Convert a variable in the source language to potentially a de Bruijn
 -- index, if the variable with that identifier appears bound within the scope
 -- this fragment is reified in.
-var :: Id -> IxExpr
+var :: Id -> Ix Expr
 var v l vs =
   case H.lookup v vs of
     Just l' -> VarE (l - l')
@@ -62,49 +65,46 @@ var v l vs =
 -- | Desugar an if expression into a case expression with boolean
 -- patterns. Boolean patterns are not a source language feature, but are used
 -- internally.
-ifIx :: IxExpr
+ifIx :: Ix Expr
      -- ^ Desugared Condition Expression
-     -> IxExpr
+     -> Ix Expr
      -- ^ Desugared Then Branch
-     -> IxExpr
+     -> Ix Expr
      -- ^ Desugared Else Branch
-     -> IxExpr
-ifIx c t e = embedIx $ CaseEB c
-               [ ( ValPB (BoolB True),  t)
-               , ( ValPB (BoolB False), e)
-               ]
+     -> Ix Expr
+ifIx c t e = embedIx $ ifEB c t e
 
 -- | Convert a function application in the source language into one in the
 -- desugared language.
-apply :: Id -> [IxExpr] -> IxExpr
+apply :: Id -> [Ix Expr] -> Ix Expr
 apply x = embedIx . AppEB (var x)
 
 -- | Desugaring of (possibly recursive) let expressions. This is not a simple
 -- embedding because a @ let @ expression introduces a variable.
-letIx :: Id -> IxExpr -> IxExpr -> IxExpr
+letIx :: Id -> Ix Expr -> Ix Expr -> Ix Expr
 letIx x a b l vs = LetE (a l' vs') (b l' vs')
   where
     l'  = l + 1
     vs' = H.insert x l vs
 
-compileListComp :: IxExpr
+compileListComp :: Ix Expr
                 -- ^ The element expression
-                -> [GenB IxExpr]
+                -> [GenB (Ix Expr)]
                 -- ^ The list of generators
-                -> IxExpr
+                -> Ix Expr
                 -- ^ The tail of the result
-                -> IxExpr
+                -> Ix Expr
 
 compileListComp eix []     aix = embedIx (LitEB (ConsB eix aix))
 compileListComp eix (g:gs) aix = compileGen g aix (compileListComp eix gs)
   where
-    compileGen :: GenB IxExpr
+    compileGen :: GenB (Ix Expr)
                -- ^ A generator
-               -> IxExpr
+               -> Ix Expr
                -- ^ The tail of the result
-               -> (IxExpr -> IxExpr)
+               -> (Ix Expr -> Ix Expr)
                -- ^ A continuation, to generate the inner loop of the generator
-               -> IxExpr
+               -> Ix Expr
     compileGen (FilterB pix) bix inner = ifIx pix (inner bix) bix
     compileGen (GenB p gix)  bix inner = \ l vs ->
       let cix = local (l+1)
@@ -114,26 +114,35 @@ compileListComp eix (g:gs) aix = compileGen g aix (compileListComp eix gs)
                           ]
       in apply "_mapa" [fix, gix, bix] l vs
 
-compileFn :: [FnArmB IxExpr] -> IxExpr
+compileFn :: [FnArmB (Ix Expr)] -> Ix Expr
 compileFn []       _ _  = error "compileFn: No arms in function body."
 compileFn as@(a:_) l vs = FnE arity body
   where
     arity = let FnArm _ ps _ _ = a in length ps
     xs    = map local [l .. l + arity - 1]
-    body  = compileCase xs (close FailE) as (l + arity) vs
+    body  = case compileCase xs (close Nothing) as (l + arity) vs of
+              Nothing -> error "compileFn: Empty case expression!"
+              Just b  -> b
 
-compileCase :: [IxExpr]
+compileCase :: [Ix Expr]
             -- ^ Expressions to be matched
-            -> IxExpr
-            -- ^ Default fallthrough Expression
-            -> [FnArmB IxExpr]
+            -> Ix (Maybe Expr)
+            -- ^ Potential fallthrough expression
+            -> [FnArmB (Ix Expr)]
             -- ^ Remaining patterns, and their consequent expressions (case
             -- arms).
-            -> IxExpr
+            -> Ix (Maybe Expr)
 
-compileCase [] d []                           = d
-compileCase [] d ((FnArm _ [] e (Just p)):as) = ifIx p e (compileCase [] d as)
-compileCase [] _ ((FnArm _ [] e Nothing):_)   = e
+compileCase [] d [] = d
+
+compileCase [] d ((FnArm _ [] eix (Just pix)):as) = \l vs ->
+  let p      = pix l vs
+      e      = eix l vs
+      ifE    = embed . ifEB p e
+      guardE = Just . embed $ guardEB p e
+  in (ifE <$> compileCase [] d as l vs) <|> guardE
+
+compileCase [] _ ((FnArm _ [] e Nothing):_) = \l vs -> Just (e l vs)
 compileCase [] _ _ = error "compileCase: case expression, pattern counts mismatched."
 
 compileCase (e:es) d as = foldr compileSection d
@@ -141,49 +150,53 @@ compileCase (e:es) d as = foldr compileSection d
                         . groupByFstPat
                         $ as
   where
-    compileSection :: ([FnArmB IxExpr], [FnArmB IxExpr])
+    compileSection :: ([FnArmB (Ix Expr)], [FnArmB (Ix Expr)])
                    -- ^ A pair of arms, the first with constructor patterns as
-                   -- their first pattern, and the second with variable patterns.
-                   -> IxExpr
-                   -- ^ A fallthrough for this case section.
-                   -> IxExpr
+                   -- their first pattern, and the second with variable
+                   -- patterns.
+                   -> Ix (Maybe Expr)
+                   -- ^ A potential fallthrough for this case section.
+                   -> Ix (Maybe Expr)
 
     -- A special case: if there are no constructor patterns, then the case
     -- expression is just a renaming, so we may discard it.
-    compileSection ([], vcs) dix l vs
-      | VarE u <- e l vs = compileCase es dix (stripLocalAlias (l - u) <$> vcs) l vs
+    compileSection ([], vcs) dmix l vs | VarE u <- e l vs =
+      compileCase es dmix (stripLocalAlias (l - u) <$> vcs) l vs
 
-    compileSection (ccs, vcs) dix l vs =
-      let varCase  = compileVars vcs dix
+    compileSection (ccs, vcs) dmix l vs =
+      let varCase  = compileVars vcs dmix
           ctrCases = compileCtrs ccs
-      in  embedCaseIx e (ctrCases ++ [varCase]) l vs
+      in  Just $ embedCaseIx e (ctrCases ++ [varCase]) l vs
 
-    -- | Group constructors by the shape of their outer pattern and recursively compile
-    -- case expressions for the sub patterns.
+    -- | Group constructors by the shape of their outer pattern and recursively
+    -- compile case expressions for the sub patterns.
     compileCtrs = map compileCtrGroup
                 . groupBy ((==) `on` fstPatShape)
-                . sortBy (comparing fstPatShape)
+                . sortBy  (comparing fstPatShape)
 
     -- | Create the case arm for the group of patterns sharing the same outer
     -- constructor.
-    compileCtrGroup :: [FnArmB IxExpr] -> (SimplePatt, IxExpr)
+    compileCtrGroup :: [FnArmB (Ix Expr)] -> Ix (Maybe (SimplePatt, Expr))
     compileCtrGroup []        = error "compileCtrGroup: Empty Constructor Group"
     compileCtrGroup ccs@(c:_) =
       let pat       = fstPat c
           simplePat = simplify pat
-          cix l vs =
+          cmix l vs =
             let patVs = map local [l - holes simplePat .. l - 1]
-            in  compileCase (patVs ++ es) (close FallThroughE) (stripCtrPat <$> ccs) l vs
-      in  (simplePat, cix)
+            in  compileCase (patVs ++ es) (close Nothing) (stripCtrPat <$> ccs) l vs
+      in withPatt simplePat cmix
 
     -- | Create the case arm for the variable cases.
-    compileVars :: [FnArmB IxExpr] -> IxExpr -> (SimplePatt, IxExpr)
-    compileVars [] dix  = (VarPB "_", dix)
-    compileVars vcs dix =
-      let cix l vs = compileCase es dix (stripLocalAlias (l - 1) <$> vcs) l vs
-      in  (VarPB "_", cix)
+    compileVars :: [FnArmB (Ix Expr)]
+                -> Ix (Maybe Expr)
+                -> Ix (Maybe (SimplePatt, Expr))
+    compileVars []  dmix = withPatt (VarPB "_") dmix
+    compileVars vcs dmix =
+      let cmix l vs = compileCase es dmix (stripLocalAlias (l - 1) <$> vcs) l vs
+      in  withPatt (VarPB "_") cmix
 
-    pairSections :: [[FnArmB IxExpr]] -> [([FnArmB IxExpr], [FnArmB IxExpr])]
+    pairSections :: [[FnArmB (Ix Expr)]]
+                 -> [([FnArmB (Ix Expr)], [FnArmB (Ix Expr)])]
     pairSections [] = []
     pairSections [xs]
       | isFstPatVar (head xs) = [([], xs)]
@@ -192,13 +205,13 @@ compileCase (e:es) d as = foldr compileSection d
       | isFstPatVar (head xs) = ([], xs) : pairSections (ys:xss)
       | otherwise             = (xs, ys) : pairSections xss
 
-    groupByFstPat :: [FnArmB IxExpr] -> [[FnArmB IxExpr]]
+    groupByFstPat :: [FnArmB (Ix Expr)] -> [[FnArmB (Ix Expr)]]
     groupByFstPat = groupBy ((==) `on` isFstPatVar)
 
     -- | Pop the first pattern from the arm, as long as it is a variable
     -- pattern, and replace occurrences of the variable in the consequent
     -- expression with a local variable at a given level.
-    stripLocalAlias :: Int -> FnArmB IxExpr -> FnArmB IxExpr
+    stripLocalAlias :: Int -> FnArmB (Ix Expr) -> FnArmB (Ix Expr)
     stripLocalAlias lvl (FnArm i ((VarP v):ps) e' g) =
       let rn ix l vs = ix l (H.insert v lvl vs) in
         FnArm i ps (rn e') (rn <$> g)
@@ -210,10 +223,11 @@ compileCase (e:es) d as = foldr compileSection d
     stripCtrPat (FnArm i (p:ps) e' g) = FnArm i ((subPats p) ++ ps) e' g
     stripCtrPat _ = error "stripCtrPat: empty pattern list"
 
-    embedCaseIx :: IxExpr -> [(SimplePatt, IxExpr)] -> IxExpr
-    embedCaseIx eix aixs l vs = CaseE (eix l vs) (intoArm l vs <$> aixs)
+    embedCaseIx :: Ix Expr -> [Ix (Maybe (SimplePatt, Expr))] -> Ix Expr
+    embedCaseIx eix amixs l vs = CaseE (eix l vs) (catMaybes ((\mix -> mix l vs) <$> amixs))
 
-    intoArm l vs (p, b)  = (p, b (l + holes p) vs)
+    withPatt :: SimplePatt -> Ix (Maybe Expr) -> Ix (Maybe (SimplePatt, Expr))
+    withPatt p emix l vs = (p,) <$> emix (l + holes p) vs
 
     fstPat :: FnArmB a -> Patt
     fstPat (FnArm _ ps _ _) = head ps

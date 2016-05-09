@@ -22,9 +22,6 @@ import Token (Id)
 --
 --    * Function application supports arbitrary expressions in the callable
 --    position, not just identifiers.
---
---    * Extra expressions (@ FailE @, @ FallThroughE @) have been added to
---    support the proper compilation of pattern matching.
 data Expr = LitE (LitB Expr)
           | VarE !Int
           | FreeE Id
@@ -33,10 +30,6 @@ data Expr = LitE (LitB Expr)
           | AppE Expr [Expr]
           | LetE Expr Expr
           | LocE String (Located Expr)
-
-          -- Case Expression Specific
-          | FailE
-          | FallThroughE
             deriving (Eq, Show)
 
 -- | A functor whose least-fixed point is isomorphic to @ Expr @.
@@ -48,8 +41,6 @@ data ExprB a = LitEB (LitB a)
              | AppEB a [a]
              | LetEB a a
              | LocEB String (Located a)
-             | FailEB
-             | FallThroughEB
                deriving ( Eq, Show
                         , P.Foldable
                         , Traversable
@@ -75,8 +66,6 @@ instance Foldable Expr where
   project (AppE f xs)   = AppEB f xs
   project (LetE a b)    = LetEB a b
   project (LocE lbl le) = LocEB lbl le
-  project FailE         = FailEB
-  project FallThroughE  = FallThroughEB
 
 instance Unfoldable Expr where
   embed (LitEB s)      = LitE s
@@ -87,5 +76,24 @@ instance Unfoldable Expr where
   embed (AppEB f xs)   = AppE f xs
   embed (LetEB a b)    = LetE a b
   embed (LocEB lbl le) = LocE lbl le
-  embed FailEB         = FailE
-  embed FallThroughEB  = FallThroughE
+
+-- | Build an if expression.
+ifEB :: a
+     -- ^ Condition
+     -> a
+     -- ^ Then Branch
+     -> a
+     -- ^ Else Branch
+     -> ExprB a
+
+ifEB c t e = CaseEB c [(ValPB (BoolB True), t), (ValPB (BoolB False), e)]
+
+-- | Build a guard expression (an if that only has a `then` branch). Used in
+-- compiling pattern matches with guards.
+guardEB :: a
+        -- ^ Condition
+        -> a
+        -- ^ Then Branch
+        -> ExprB a
+
+guardEB c t = CaseEB c [(ValPB (BoolB True), t)]

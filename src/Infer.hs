@@ -454,8 +454,6 @@ typeOf gloDefs = check
       catchError (check (dislocate le)) $ \e -> do
         throwError $ CtxE lbl (le *> pure e)
 
-    check _ = newVar
-
     checkArm etr (p, a) = do
       unify etr =<< patTy p
       atr <- check a
