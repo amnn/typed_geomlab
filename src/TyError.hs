@@ -112,8 +112,8 @@ printError fname input (CtxE root chain@(L rootSp _)) = do
         Just (pte, pta) -> do
           newLine
           indentS 1 "Whilst trying to unify:"
-          indentS 2 $ "Expected: " ++ show pte
-          indentS 2 $ "Actual:   " ++ show pta
+          indentS 2 $ "          " ++ show pte
+          indentS 2 $ "    with: " ++ show pta
 
     unwind _ (L sp (CtxE lbl (L sp' (CtxE lbl' le@(L sp'' _)))))
       | sp == sp' = do
