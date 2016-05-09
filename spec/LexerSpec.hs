@@ -241,36 +241,3 @@ spec = do
     , LPar, Num 1, BinOp ":", RPar, Semi
     , LPar, Atom "foo", BinOp ":", RPar, Semi
     ]
-
-  locLexFile "test/gen_sym.geom" $
-    [ L (S (P 1 1) 0 6)   Define
-    , L (S (P 1 8) 7 8)   (Ident "labcount")
-    , L (S (P 1 17) 16 1) (BinOp "=")
-    , L (S (P 1 19) 18 4) (Ident "_new")
-    , L (S (P 1 23) 22 1) LPar
-    , L (S (P 1 24) 23 1) (Num 0)
-    , L (S (P 1 25) 24 1) RPar
-    , L (S (P 1 26) 25 1) Semi
-
-    , L (S (P 2 1) 27 6)  Define
-    , L (S (P 2 8) 34 5)  (Ident "label")
-    , L (S (P 2 13) 39 1) LPar
-    , L (S (P 2 14) 40 1) RPar
-    , L (S (P 2 16) 42 1) (BinOp "=")
-    , L (S (P 2 18) 44 4) (Ident "_set")
-    , L (S (P 2 22) 48 1) LPar
-    , L (S (P 2 23) 49 8) (Ident "labcount")
-    , L (S (P 2 31) 57 1) Comma
-    , L (S (P 2 33) 59 4) (Ident "_get")
-    , L (S (P 2 37) 63 1) LPar
-    , L (S (P 2 38) 64 8) (Ident "labcount")
-    , L (S (P 2 46) 72 1) RPar
-    , L (S (P 2 48) 74 1) (BinOp "+")
-    , L (S (P 2 50) 76 1) (Num 1)
-    , L (S (P 2 51) 77 1) RPar
-    , L (S (P 2 52) 78 1) Semi
-    , L (S (P 3 1) 80 5)  (Ident "label")
-    , L (S (P 3 6) 85 1)  LPar
-    , L (S (P 3 7) 86 1)  RPar
-    , L (S (P 3 8) 87 1)  Semi
-    ]

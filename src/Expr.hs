@@ -33,7 +33,6 @@ data Expr = LitE (LitB Expr)
           | FnE !Int Expr
           | AppE Expr [Expr]
           | LetE Expr Expr
-          | SeqE Expr Expr
           | LocE String (Located Expr)
 
           -- Case Expression Specific
@@ -50,7 +49,6 @@ data ExprB a = LitEB (LitB a)
              | FnEB !Int a
              | AppEB a [a]
              | LetEB a a
-             | SeqEB a a
              | LocEB String (Located a)
              | FailEB
              | FallThroughEB
@@ -79,7 +77,6 @@ instance Foldable Expr where
   project (FnE n e)     = FnEB n e
   project (AppE f xs)   = AppEB f xs
   project (LetE a b)    = LetEB a b
-  project (SeqE a b)    = SeqEB a b
   project (LocE lbl le) = LocEB lbl le
   project FailE         = FailEB
   project FallThroughE  = FallThroughEB
@@ -93,7 +90,6 @@ instance Unfoldable Expr where
   embed (FnEB n e)     = FnE n e
   embed (AppEB f xs)   = AppE f xs
   embed (LetEB a b)    = LetE a b
-  embed (SeqEB a b)    = SeqE a b
   embed (LocEB lbl le) = LocE lbl le
   embed FailEB         = FailE
   embed FallThroughEB  = FallThroughE

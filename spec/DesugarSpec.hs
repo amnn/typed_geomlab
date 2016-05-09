@@ -214,15 +214,3 @@ spec = do
     , Eval (AppE (FreeE "_lsect") [FreeE ":", numB 1])
     , Eval (AppE (FreeE "_lsect") [FreeE ":", atomB "foo"])
     ]
-
-  desugarFile "test/gen_sym.geom" $
-    [ Def "labcount" (AppE (FreeE "_new") [numB 0])
-    , Def "label"    (FnE 0 (AppE (FreeE "_set")
-                        [ FreeE "labcount"
-                        , AppE (FreeE "+")
-                            [ AppE (FreeE "_get") [FreeE "labcount"]
-                            , numB 1
-                            ]
-                        ]))
-    , Eval (AppE (FreeE "label") [])
-    ]

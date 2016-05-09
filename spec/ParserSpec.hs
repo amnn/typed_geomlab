@@ -311,16 +311,3 @@ spec = do
               (annL (LocS "left section") (S (P 1 24) 23 7)
                  (LSectS (annL (LocS "operand") (S (P 1 25) 24 4) (atomB "foo")) ":")))
     ]
-
-  parseFile "test/gen_sym.geom" $
-    [ Def "labcount" (AppS "_new" [numB 0])
-    , Def "label"    (FnS [ FnArm "label" []
-                              (AppS "_set" [ VarS "labcount"
-                                           , AppS "+" [ AppS "_get" [VarS "labcount"]
-                                                      , numB 1
-                                                      ]
-                                           ])
-                              Nothing
-                          ])
-    , Eval (AppS "label" [])
-    ]

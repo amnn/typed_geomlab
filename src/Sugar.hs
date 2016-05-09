@@ -29,7 +29,6 @@ data Sugar = LitS (LitB Sugar)
            | LSectS Sugar Id
            | RSectS Id Sugar
            | LetS Id Sugar Sugar
-           | SeqS Sugar Sugar
            | LocS String (Located Sugar)
              deriving (Eq, Show)
 
@@ -44,7 +43,6 @@ data SugarB a = LitSB (LitB a)
               | LSectSB a Id
               | RSectSB Id a
               | LetSB Id a a
-              | SeqSB a a
               | LocSB String (Located a)
                 deriving (Eq, Show, Functor)
 
@@ -88,7 +86,6 @@ instance Foldable Sugar where
   project (LSectS f x)     = LSectSB f x
   project (RSectS x f)     = RSectSB x f
   project (LetS x a b)     = LetSB x a b
-  project (SeqS a b)       = SeqSB a b
   project (LocS lbl ls)    = LocSB lbl ls
 
 instance Unfoldable Sugar where
@@ -102,5 +99,4 @@ instance Unfoldable Sugar where
   embed (LSectSB f x)     = LSectS f x
   embed (RSectSB x f)     = RSectS x f
   embed (LetSB x a b)     = LetS x a b
-  embed (SeqSB a b)       = SeqS a b
   embed (LocSB lbl ls)    = LocS lbl ls

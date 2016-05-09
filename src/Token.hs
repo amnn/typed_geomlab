@@ -16,7 +16,6 @@ data Token =
   -- Keywords
   | Define | Else | Function | If | In | Let | Then | When
   -- Punctuation
-  | AndThen
   | Anon
   | Gen
   | Range
@@ -49,7 +48,6 @@ instance Show Token where
   show Let       = "let"
   show Then      = "then"
   show When      = "when"
-  show AndThen   = ">>"
   show Anon      = "_"
   show Gen       = "<-"
   show Range     = ".."
@@ -106,8 +104,7 @@ kws = H.fromList (keywords ++ binOps ++ monOps)
     keywords = map unwrap
                [ Define, Else, Function, If
                , In, Let, Then, When
-               , Anon, AndThen
-               , Gen, Range
+               , Anon, Gen, Range
                ]
     binOps = map (wrap BinOp)
              [ "+", "-", "*", "/"

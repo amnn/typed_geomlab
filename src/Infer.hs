@@ -457,8 +457,6 @@ typeOf gloDefs = check
       popLocal
       return btr
 
-    check (SeqE a b) = check a >> check b
-
     check (LocE lbl le) =
       catchError (check (dislocate le)) $ \e -> do
         throwError $ CtxE lbl (le *> pure e)

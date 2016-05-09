@@ -30,7 +30,6 @@ desugarExpr s = cata d s 0 H.empty
     d (LSectSB e x)     = apply "_lsect" [var x, e]
     d (RSectSB x e)     = apply "_rsect" [var x, e]
     d (IfSB c t e)      = embedIx $ IfEB c t e
-    d (SeqSB a b)       = embedIx $ SeqEB a b
     d (LocSB lbl le)    = embedIx $ LocEB lbl le
     d (LitSB l)         = embedIx $ LitEB l
     d (LetSB x a b)     = letIx x a b

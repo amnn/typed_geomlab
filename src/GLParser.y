@@ -25,7 +25,6 @@ import Token
        ';'      { L s Semi }
        '|'      { L s VBar }
        '_'      { L s Anon }
-       '>>'     { L s AndThen }
        '<-'     { L s Gen }
        '..'     { L s Range }
        '+'      { L s (BinOp "+") }
@@ -87,7 +86,6 @@ Expr ::                      { Located Sugar }
 Expr : Cond                  { $1 }
      | let Decl in Expr      { reify "let expression" $ $1 *> declToLet $2 (reify "body" $4) }
      | function Formals Expr { $1 *> anonFn $2 $3 }
-     | Cond '>>' Expr        { SeqS <@> $1 <*> $3 }
 
 ExprOrSect ::                      { Located Sugar }
 ExprOrSect : let Decl in Expr      { reify "let expression" $
@@ -96,7 +94,6 @@ ExprOrSect : let Decl in Expr      { reify "let expression" $
 
            | function Formals Expr { $1 *> anonFn $2 $3 }
            | CondOrSect            { $1 }
-           | Cond '>>' Expr        { SeqS <@> $1 <*> $3 }
 
 Cond ::                            { Located Sugar }
 Cond : Term                        { $1 }
