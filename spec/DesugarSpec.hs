@@ -56,9 +56,10 @@ spec = do
 
   desugarFile "test/not.geom" $
     [ Def "not" (FnE 1
-                   (IfE (VarE 1)
-                     (FreeE "false")
-                     (FreeE "true")))
+                   (CaseE (VarE 1)
+                      [ ( ValPB (BoolB True),  FreeE "false")
+                      , ( ValPB (BoolB False), FreeE "true")
+                      ]))
 
     , Eval (AppE (FreeE "not") [FreeE "true"])
     , Eval (AppE (FreeE "not") [FreeE "false"])
@@ -73,14 +74,21 @@ spec = do
                             , ( VarPB "_", FailE)
                             ]))
 
-    , Def "_range" (FnE 2 (IfE (AppE (FreeE ">") [VarE 2,VarE 1])
-                             nilB
-                             (AppE (FreeE ":") [ VarE 2
-                                               , AppE (FreeE "_range")
-                                                   [ AppE (FreeE "+") [VarE 2, LitE (NumB 1.0)]
-                                                   , VarE 1
-                                                   ]
-                                               ])))
+    , Def "_range" (FnE 2 (CaseE (AppE (FreeE ">") [VarE 2,VarE 1])
+                             [ ( ValPB (BoolB True), nilB)
+                             , ( ValPB (BoolB False)
+                               , (AppE (FreeE ":")
+                                    [ VarE 2
+                                    , AppE (FreeE "_range")
+                                       [ AppE (FreeE "+")
+                                           [ VarE 2
+                                           , LitE (NumB 1.0)
+                                           ]
+                                       , VarE 1
+                                       ]
+                                    ])
+                               )
+                             ]))
 
     , Def "a" (numB 1.0)
     , Def "b" (numB 10.0)
@@ -101,9 +109,10 @@ spec = do
                                               [ ( ValPB (ConsB () ())
                                                 , CaseE (VarE 1)
                                                     [ ( ValPB NilB
-                                                      , IfE (FreeE "y")
-                                                          (consB (VarE 4) (VarE 5))
-                                                          (VarE 5)
+                                                      , CaseE (FreeE "y")
+                                                          [ (ValPB (BoolB True), consB (VarE 4) (VarE 5))
+                                                          , (ValPB (BoolB False), VarE 5)
+                                                          ]
                                                       )
                                                     , ( VarPB "_", FallThroughE)
                                                     ]
@@ -147,7 +156,10 @@ spec = do
     ]
 
   desugarFile "test/empty.geom" $
-    [ Def "foo" (FnE 0 (IfE (FreeE "true") (numB 1) (numB 2)))
+    [ Def "foo" (FnE 0 (CaseE (FreeE "true")
+                          [ ( ValPB (BoolB True),  numB 1)
+                          , ( ValPB (BoolB False), numB 2)
+                          ]))
     ]
 
   desugarFile "test/folds.geom" $
@@ -178,9 +190,12 @@ spec = do
     , Def "filter" (FnE 2
                       (LetE
                          (FnE 2
-                            (IfE (AppE (VarE 5) [VarE 2])
-                               (AppE (FreeE ":") [VarE 2, VarE 1])
-                               (VarE 1)))
+                            (CaseE (AppE (VarE 5) [VarE 2])
+                               [ ( ValPB (BoolB True)
+                                 , AppE (FreeE ":") [VarE 2, VarE 1]
+                                 )
+                               , (ValPB (BoolB False), VarE 1)
+                               ]))
                          (AppE (FreeE "foldr") [VarE 1, nilB, VarE 2])))
 
     , Def "length" (FnE 1

@@ -29,7 +29,7 @@ desugarExpr s = cata d s 0 H.empty
     d (RangeSB f t)     = apply "_range" [f, t]
     d (LSectSB e x)     = apply "_lsect" [var x, e]
     d (RSectSB x e)     = apply "_rsect" [var x, e]
-    d (IfSB c t e)      = embedIx $ IfEB c t e
+    d (IfSB c t e)      = ifIx c t e
     d (LocSB lbl le)    = embedIx $ LocEB lbl le
     d (LitSB l)         = embedIx $ LitEB l
     d (LetSB x a b)     = letIx x a b
@@ -58,6 +58,21 @@ var v l vs =
   case H.lookup v vs of
     Just l' -> VarE (l - l')
     Nothing -> FreeE v
+
+-- | Desugar an if expression into a case expression with boolean
+-- patterns. Boolean patterns are not a source language feature, but are used
+-- internally.
+ifIx :: IxExpr
+     -- ^ Desugared Condition Expression
+     -> IxExpr
+     -- ^ Desugared Then Branch
+     -> IxExpr
+     -- ^ Desugared Else Branch
+     -> IxExpr
+ifIx c t e = embedIx $ CaseEB c
+               [ ( ValPB (BoolB True),  t)
+               , ( ValPB (BoolB False), e)
+               ]
 
 -- | Convert a function application in the source language into one in the
 -- desugared language.
@@ -90,7 +105,7 @@ compileListComp eix (g:gs) aix = compileGen g aix (compileListComp eix gs)
                -> (IxExpr -> IxExpr)
                -- ^ A continuation, to generate the inner loop of the generator
                -> IxExpr
-    compileGen (FilterB pix) bix inner = embedIx (IfEB pix (inner bix) bix)
+    compileGen (FilterB pix) bix inner = ifIx pix (inner bix) bix
     compileGen (GenB p gix)  bix inner = \ l vs ->
       let cix = local (l+1)
           iix = inner cix
@@ -117,7 +132,7 @@ compileCase :: [IxExpr]
             -> IxExpr
 
 compileCase [] d []                           = d
-compileCase [] d ((FnArm _ [] e (Just p)):as) = embedIx $ IfEB p e (compileCase [] d as)
+compileCase [] d ((FnArm _ [] e (Just p)):as) = ifIx p e (compileCase [] d as)
 compileCase [] _ ((FnArm _ [] e Nothing):_)   = e
 compileCase [] _ _ = error "compileCase: case expression, pattern counts mismatched."
 

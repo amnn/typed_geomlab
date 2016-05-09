@@ -420,13 +420,6 @@ typeOf gloDefs = check
           Just tr -> instantiate tr
       | otherwise = throwError $ UnboundVarE v
 
-    check (IfE c t e) = do
-      [ctr, ttr, tte] <- mapM check [c, t, e]
-      btr <- newTy BoolTB
-      unify btr ctr
-      unify ttr tte
-      return ttr
-
     check (CaseE e as) = do
       etr        <- check e
       (atr:atrs) <- mapM (checkArm etr) as
