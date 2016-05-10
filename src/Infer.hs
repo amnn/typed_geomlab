@@ -20,6 +20,7 @@ import qualified Data.HashMap           as H
 import           Data.Literal
 import           Data.Location
 import           Data.Monad.DynArray
+import           Data.Monad.Type
 import           Data.Patt
 import           Data.STRef
 import           Data.Structure         (shapeEq)
@@ -30,7 +31,6 @@ import           Data.Type
 import           Debug.Trace            (traceM)
 
 type GSRef  s = STRef s (GlobalState s)
-type TyRef  s = STRef s (StratTy s)
 type GloDef s = H.Map Id (Maybe (TyRef s))
 
 -- | This state is held in a reference that is available from anywhere in the
@@ -48,25 +48,6 @@ data GlobalState s = GS { tyCtx           :: DynArray s (TyRef s)
 data ScopedState s = SS { gsRef :: GSRef s
                         , lvl   :: !Int
                         }
-
--- | A representation of the level of a type, with a notion of ordering. @ Gen @
--- represents the "generalised" level, which is considered higher than all other
--- levels.
-data Level = Lvl Int | Gen deriving (Eq, Show, Ord)
-
--- | Representation of variables. Each can either be a name, or a link to
--- another type reference.
-data StratV s = FreeV Id | FwdV (TyRef s) deriving Eq
-
--- | Tag type for cycle detection (a's are marked as they are visited, if a
--- marked object is visited again, then we have detected a cycle).
-data Marked a = Set a | Marked !Int deriving (Eq, Show)
-
--- | Representation of types, annotated by their level.
-data StratTy s = StratTy { ty       :: TyB (StratV s) (TyRef s)
-                         , newLevel :: !(Marked Level)
-                         , oldLevel :: !Level
-                         } deriving Eq
 
 -- | Constraint of all the Monads used by the type checker.
 type MonadInfer m = ( MonadST m
