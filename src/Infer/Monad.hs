@@ -1,5 +1,6 @@
 {-# LANGUAGE ConstraintKinds  #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE NamedFieldPuns   #-}
 
 {-|
 
@@ -19,6 +20,7 @@ import           Data.Monad.State
 import           Data.Monad.Type
 import           Data.STRef
 import           Data.TyError
+import           Data.Type
 
 -- | Constraint of all the Monads used by the type checker.
 type MonadInfer m = ( MonadST m
@@ -64,3 +66,16 @@ getLocalTy ix = getTyCtx >>= liftST . peek ix
 newScope :: MonadInfer m => m a -> m a
 newScope = local bumpScope
   where bumpScope st@SS {lvl = l} = st{lvl = l + 1}
+
+-- | Resolves a type to its concrete representation. If the type is a variable
+-- and that variable is a forwarding pointer to some other type, follow the
+-- pointers until a concrete type is reached, and compress the path followed.
+repr :: MonadInfer m => TyRef (World m) -> m (TyRef (World m))
+repr tr = do
+  sty@StratTy{ty} <- readIRef tr
+  case ty of
+    VarTB (FwdV _tr) -> do
+      _tr <- repr _tr
+      writeIRef tr $ sty {ty = (VarTB (FwdV _tr))}
+      return _tr
+    _ -> return tr
