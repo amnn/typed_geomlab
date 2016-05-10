@@ -9,9 +9,9 @@ module Lexer ( Alex
              ) where
 
 import qualified Data.ByteString.Lazy.Char8 as BS
-import Data.Char (chr)
-import Location
-import Token
+import           Data.Char                  (chr)
+import           Data.Location
+import           Data.Token
 }
 
 %wrapper "monad-bytestring"

@@ -3,11 +3,11 @@
 module GLParser where
 
 import Lexer
-import Literal
-import Location
-import Patt
-import Sugar
-import Token
+import Data.Literal
+import Data.Location
+import Data.Patt
+import Data.Sugar
+import Data.Token
 
 }
 

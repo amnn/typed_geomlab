@@ -1,8 +1,8 @@
 module LexerSpec where
 
-import SpecHelper
-import Location
-import Token
+import           Data.Location
+import           Data.Token
+import           SpecHelper
 
 spec :: Spec
 spec = do

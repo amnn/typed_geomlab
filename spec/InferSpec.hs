@@ -1,10 +1,10 @@
 module InferSpec where
 
-import SpecHelper
-import Sugar
-import Token
-import TyError
-import Type
+import           Data.Sugar
+import           Data.Token
+import           Data.TyError
+import           Data.Type
+import           SpecHelper
 
 def :: Id -> Ty Id -> Para (Either TyError (Ty Id))
 def x = Def x . Right

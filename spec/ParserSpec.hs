@@ -1,10 +1,10 @@
 module ParserSpec where
 
-import Literal
-import Location
-import Patt
-import SpecHelper
-import Sugar
+import           Data.Literal
+import           Data.Location
+import           Data.Patt
+import           Data.Sugar
+import           SpecHelper
 
 spec :: Spec
 spec = do

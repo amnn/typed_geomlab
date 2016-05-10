@@ -1,20 +1,20 @@
 {-# LANGUAGE NamedFieldPuns #-}
 module Main where
 
+import           Control.Monad.State
 import qualified Data.ByteString.Lazy.Char8 as BS
-import Control.Monad.State
-import Desugar (desugarExpr)
-import qualified Expr as E (stripLoc)
-import GLParser (parseExpr)
-import Infer (typeCheck)
-import Lexer
-import Sugar hiding (stripLoc)
-import qualified Sugar as S (stripLoc)
-import System.Console.ANSI
-import System.Environment
-import Token
-import TyError
-import Type
+import           Desugar                    (desugarExpr)
+import qualified Expr                       as E (stripLoc)
+import           GLParser                   (parseExpr)
+import           Infer                      (typeCheck)
+import           Lexer
+import           Sugar                      hiding (stripLoc)
+import qualified Sugar                      as S (stripLoc)
+import           System.Console.ANSI
+import           System.Environment
+import           Token
+import           TyError
+import           Type
 
 data Opt = Opt { showRaw      :: !Bool
                , showSugar    :: !Bool

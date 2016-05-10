@@ -11,23 +11,23 @@ module SpecHelper
        , annL
        ) where
 
-import Prelude hiding (Foldable)
+import           Control.Monad              (unless)
 import qualified Data.ByteString.Lazy.Char8 as BS
-import Control.Monad (unless)
-import Desugar (desugarExpr)
-import Expr hiding (stripLoc)
-import qualified Expr as E (stripLoc)
-import GLParser (parseExpr)
-import Infer (typeCheck)
-import Lexer
-import Location
-import Sugar hiding (stripLoc)
-import qualified Sugar as S (stripLoc)
-import Test.Hspec
-import Test.HUnit (assertFailure)
-import Token
-import TyError
-import Type (Ty, alphaEq)
+import           Data.Expr                  hiding (stripLoc)
+import qualified Data.Expr                  as E (stripLoc)
+import           Data.Location
+import           Data.Sugar                 hiding (stripLoc)
+import qualified Data.Sugar                 as S (stripLoc)
+import           Data.Token
+import           Data.TyError
+import           Data.Type                  (Ty, alphaEq)
+import           Desugar                    (desugarExpr)
+import           GLParser                   (parseExpr)
+import           Infer                      (typeCheck)
+import           Lexer
+import           Prelude                    hiding (Foldable)
+import           Test.Hspec
+import           Test.HUnit                 (assertFailure)
 
 lexFile :: FilePath -> [Token] -> Spec
 lexFile = testFile "lexes" (==) scanTokens

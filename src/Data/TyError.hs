@@ -1,10 +1,10 @@
-module TyError where
+module Data.TyError where
 
 import qualified Data.ByteString.Lazy.Char8 as BS
-import Location
-import System.Console.ANSI
-import Token
-import Type
+import           Data.Location
+import           Data.Token
+import           Data.Type
+import           System.Console.ANSI
 
 -- | Possible Type Errors that the type checker may emit
 data TyError = UnboundVarE Id

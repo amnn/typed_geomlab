@@ -1,18 +1,18 @@
 {-# LANGUAGE TupleSections #-}
 module Desugar where
 
-import Control.Applicative ((<|>))
-import Data.Function (on)
-import Data.Functor.Foldable
-import qualified Data.HashMap as H
-import Data.List (groupBy, sortBy)
-import Data.Maybe (catMaybes)
-import Data.Ord (comparing)
-import Expr
-import Literal
-import Patt
-import Sugar
-import Token (Id)
+import           Control.Applicative   ((<|>))
+import           Data.Expr
+import           Data.Function         (on)
+import           Data.Functor.Foldable
+import qualified Data.HashMap          as H
+import           Data.List             (groupBy, sortBy)
+import           Data.Literal
+import           Data.Maybe            (catMaybes)
+import           Data.Ord              (comparing)
+import           Data.Patt
+import           Data.Sugar
+import           Data.Token            (Id)
 
 -- | A floating @ a @ term, containing de Bruijn indices, waiting to be placed
 -- within a particular scope.

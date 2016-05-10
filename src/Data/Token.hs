@@ -1,7 +1,7 @@
-module Token where
+module Data.Token where
 
-import qualified Data.HashMap as H
-import Location
+import qualified Data.HashMap  as H
+import           Data.Location
 
 type Id = String
 data Token =

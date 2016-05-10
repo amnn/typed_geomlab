@@ -1,10 +1,10 @@
 module DesugarSpec where
 
-import SpecHelper
-import Expr
-import Literal
-import Patt
-import Sugar
+import           Data.Expr
+import           Data.Literal
+import           Data.Patt
+import           Data.Sugar
+import           SpecHelper
 
 spec :: Spec
 spec = do

@@ -1,14 +1,17 @@
-{-# LANGUAGE TypeFamilies, DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
+{-# LANGUAGE DeriveFoldable    #-}
+{-# LANGUAGE DeriveFunctor     #-}
+{-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE TypeFamilies      #-}
 
-module Patt where
+module Data.Patt where
 
-import Prelude hiding (Foldable)
-import qualified Prelude as P (Foldable)
-import Data.Foldable (toList)
-import Data.Functor.Foldable
-import Literal
-import Structure
-import Token (Id)
+import           Data.Foldable         (toList)
+import           Data.Functor.Foldable
+import           Data.Literal
+import           Data.Structure
+import           Data.Token            (Id)
+import           Prelude               hiding (Foldable)
+import qualified Prelude               as P (Foldable)
 
 -- | Structure of patterns used in the formal parameters of functions in the @
 -- Sugar @ AST and in Case expressions in the @ Expr @ AST.

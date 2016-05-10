@@ -4,19 +4,19 @@
 Mutable, resizable STArrays with integer indices.
 Interface includes both random access and a stack interface.
 |-}
-module DynArray ( DynArray
-                , newArray_
-                , fetch
-                , peek
-                , pop'
-                , pop
-                , push
-                ) where
+module Data.Monad.DynArray ( DynArray
+                           , newArray_
+                           , fetch
+                           , peek
+                           , pop'
+                           , pop
+                           , push
+                           ) where
 
-import Control.Monad
-import Control.Monad.ST
-import qualified Data.Array.ST as STA
-import Data.STRef
+import           Control.Monad
+import           Control.Monad.ST
+import qualified Data.Array.ST    as STA
+import           Data.STRef
 
 data DArray s e = DArray { buf  :: STA.STArray s Int e
                          , size :: !Int

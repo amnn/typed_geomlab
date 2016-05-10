@@ -1,8 +1,10 @@
-{-# LANGUAGE DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
+{-# LANGUAGE DeriveFoldable    #-}
+{-# LANGUAGE DeriveFunctor     #-}
+{-# LANGUAGE DeriveTraversable #-}
 
-module Literal where
+module Data.Literal where
 
-import Token (Id)
+import           Data.Token (Id)
 
 -- | Structure of Literal values shared by Patterns, the AST and the Desugared
 -- AST.

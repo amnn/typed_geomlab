@@ -1,34 +1,33 @@
-{-# LANGUAGE ConstraintKinds
-           , FlexibleContexts
-           , NamedFieldPuns
-           , PackageImports
-           , PatternGuards
-           , RankNTypes
-           #-}
+{-# LANGUAGE ConstraintKinds  #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE NamedFieldPuns   #-}
+{-# LANGUAGE PackageImports   #-}
+{-# LANGUAGE PatternGuards    #-}
+{-# LANGUAGE RankNTypes       #-}
 
 module Infer where
 
-import Control.Monad.Except
-import Control.Monad.Reader
-import Control.Monad.ST
-import Control.Monad.ST.Class
-import Control.Monad.State
-import Data.Char (chr, ord)
-import Data.Foldable (toList)
-import Data.Function (on)
-import qualified Data.HashMap as H
-import Data.STRef
-import Debug.Trace (traceM)
-import DynArray
-import Expr
-import Literal
-import Location
-import Patt
-import Structure (shapeEq)
-import Sugar
-import Token (Id)
-import TyError
-import Type
+import           Control.Monad.Except
+import           Control.Monad.Reader
+import           Control.Monad.ST
+import           Control.Monad.ST.Class
+import           Control.Monad.State
+import           Data.Char              (chr, ord)
+import           Data.Expr
+import           Data.Foldable          (toList)
+import           Data.Function          (on)
+import qualified Data.HashMap           as H
+import           Data.Literal
+import           Data.Location
+import           Data.Monad.DynArray
+import           Data.Patt
+import           Data.STRef
+import           Data.Structure         (shapeEq)
+import           Data.Sugar
+import           Data.Token             (Id)
+import           Data.TyError
+import           Data.Type
+import           Debug.Trace            (traceM)
 
 type GSRef  s = STRef s (GlobalState s)
 type TyRef  s = STRef s (StratTy s)

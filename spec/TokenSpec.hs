@@ -1,8 +1,7 @@
 module TokenSpec where
 
-import SpecHelper
-
-import Token
+import           Data.Token
+import           SpecHelper
 
 spec :: Spec
 spec = do

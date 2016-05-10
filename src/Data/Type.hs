@@ -1,22 +1,22 @@
-{-# LANGUAGE TypeFamilies
-           , DeriveFoldable
-           , DeriveFunctor
-           , DeriveTraversable
-           , FlexibleInstances
-           , PatternGuards #-}
+{-# LANGUAGE DeriveFoldable    #-}
+{-# LANGUAGE DeriveFunctor     #-}
+{-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE PatternGuards     #-}
+{-# LANGUAGE TypeFamilies      #-}
 
-module Type where
+module Data.Type where
 
-import Prelude hiding (Foldable)
-import qualified Prelude as P (Foldable)
-import Data.Foldable (toList)
-import Data.Function (on)
-import Data.Functor.Foldable
-import qualified Data.HashMap as H
-import Data.List (intercalate)
-import Data.Traversable (mapAccumL)
-import Structure (shapeEq)
-import Token (Id)
+import           Data.Foldable         (toList)
+import           Data.Function         (on)
+import           Data.Functor.Foldable
+import qualified Data.HashMap          as H
+import           Data.List             (intercalate)
+import           Data.Structure        (shapeEq)
+import           Data.Token            (Id)
+import           Data.Traversable      (mapAccumL)
+import           Prelude               hiding (Foldable)
+import qualified Prelude               as P (Foldable)
 
 data Ty v    = BoolT | NumT | StrT | AtomT | VarT v
              | ListT (Ty v) | ArrT [Ty v] (Ty v)

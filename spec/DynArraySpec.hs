@@ -1,9 +1,9 @@
 module DynArraySpec where
 
-import SpecHelper
-import Control.Monad
-import Control.Monad.ST
-import DynArray
+import           Control.Monad
+import           Control.Monad.ST
+import           Data.Monad.DynArray
+import           SpecHelper
 
 spec :: Spec
 spec = do

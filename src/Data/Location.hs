@@ -1,7 +1,9 @@
-{-# LANGUAGE DeriveFoldable, DeriveFunctor, DeriveTraversable #-}
-module Location where
+{-# LANGUAGE DeriveFoldable    #-}
+{-# LANGUAGE DeriveFunctor     #-}
+{-# LANGUAGE DeriveTraversable #-}
+module Data.Location where
 
-import Data.Monoid ((<>))
+import           Data.Monoid ((<>))
 
 -- | An annotation linking the (parameterised) data to a specific location in
 -- the source.
@@ -14,8 +16,8 @@ data Located a = L Span a
                           )
 
 -- | A line and column, used for printing error messages.
-data Point     = P { line   :: !Int
-                   , col    :: !Int
+data Point     = P { line :: !Int
+                   , col  :: !Int
                    } deriving (Eq, Ord)
 
 -- | A representation of a location in the source file, as a line and column

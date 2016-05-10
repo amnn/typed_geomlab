@@ -1,14 +1,18 @@
-{-# LANGUAGE TypeFamilies, DeriveFunctor, DeriveFoldable, DeriveTraversable, PatternGuards #-}
+{-# LANGUAGE DeriveFoldable    #-}
+{-# LANGUAGE DeriveFunctor     #-}
+{-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE PatternGuards     #-}
+{-# LANGUAGE TypeFamilies      #-}
 
-module Sugar where
+module Data.Sugar where
 
-import Prelude hiding (Foldable)
-import qualified Prelude as P (Foldable)
-import Data.Functor.Foldable
-import Literal
-import Location
-import Patt
-import Token (Id)
+import           Data.Functor.Foldable
+import           Data.Literal
+import           Data.Location
+import           Data.Patt
+import           Data.Token            (Id)
+import           Prelude               hiding (Foldable)
+import qualified Prelude               as P (Foldable)
 
 type Gen   = GenB Sugar
 type FnArm = FnArmB Sugar
