@@ -50,7 +50,7 @@ afterMarking i tr act = do
 -- | Get the level of a type reference.
 getLevel :: MonadInfer m => TyRef (World m) -> m Level
 getLevel tr = do
-  StratTy{newLevel = Set lvl} <- readIRef tr
+  Ty{newLevel = Set lvl} <- readIRef tr
   return lvl
 
 -- | Set all level values of a type as the same. When this is done to non-leaf

@@ -20,11 +20,14 @@ import           Data.Monad.State
 import           Data.Monad.Type
 import           Data.STRef
 import           Data.TyError
-import           Data.Type
 
--- | Constraint of all the Monads used by the type checker.
-type MonadInfer m = ( MonadST m
-                    , MonadReader (ScopedState (World m)) m
+-- | Constraints of monads used to setup the type checker.
+type MonadInferTop m = ( MonadST m
+                       , MonadReader (ScopedState (World m)) m
+                       )
+
+-- | Constraint of all the Monads used to check individual expressions.
+type MonadInfer m = ( MonadInferTop m
                     , MonadError TyError m
                     )
 
@@ -50,32 +53,32 @@ modifyIRef :: MonadST m => STRef (World m) a -> (a -> a) -> m ()
 modifyIRef sr f = liftST (modifySTRef sr f)
 
 -- | Query the environment for the current level.
-getCurrLvl :: MonadInfer m => m Int
+getCurrLvl :: MonadInferTop m => m Int
 getCurrLvl = asks lvl
 
 -- | Query the global state for the list of local variables.
-getTyCtx :: MonadInfer m => m (DynArray (World m) (TyRef (World m)))
+getTyCtx :: MonadInferTop m => m (DynArray (World m) (TyRef (World m)))
 getTyCtx = tyCtx <$> (asks gsRef >>= readIRef)
 
 -- | Query the environment for the type of a particular local variable,
 -- identified by its deBruijn index.
-getLocalTy :: MonadInfer m => Int -> m (TyRef (World m))
+getLocalTy :: MonadInferTop m => Int -> m (TyRef (World m))
 getLocalTy ix = getTyCtx >>= liftST . peek ix
 
 -- | Run the supplied monad in a scope nested one level below the current one.
-newScope :: MonadInfer m => m a -> m a
+newScope :: MonadInferTop m => m a -> m a
 newScope = local bumpScope
   where bumpScope st@SS {lvl = l} = st{lvl = l + 1}
 
 -- | Resolves a type to its concrete representation. If the type is a variable
 -- and that variable is a forwarding pointer to some other type, follow the
 -- pointers until a concrete type is reached, and compress the path followed.
-repr :: MonadInfer m => TyRef (World m) -> m (TyRef (World m))
+repr :: MonadInferTop m => TyRef (World m) -> m (TyRef (World m))
 repr tr = do
-  sty@StratTy{ty} <- readIRef tr
+  ty <- readIRef tr
   case ty of
-    VarTB (FwdV _tr) -> do
+    Fwd _tr -> do
       _tr <- repr _tr
-      writeIRef tr $ sty {ty = (VarTB (FwdV _tr))}
+      writeIRef _tr $ Fwd _tr
       return _tr
     _ -> return tr

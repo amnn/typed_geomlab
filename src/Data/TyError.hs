@@ -3,7 +3,6 @@ module Data.TyError where
 import qualified Data.ByteString.Lazy.Char8 as BS
 import           Data.Location
 import           Data.Token
-import           Data.Type
 import           System.Console.ANSI
 
 -- | Possible Type Errors that the type checker may emit
@@ -15,15 +14,8 @@ data TyError = UnboundVarE Id
             -- ^ When typechecking this expression a free variable was found
             -- whose type was broken (an error was found whilst checking it).
 
-             | UnificationE (Ty Id) (Ty Id) (Maybe (Ty Id, Ty Id))
-            -- ^ Could not unify two types. Optionally, the error occurred in
-            -- the unification of larger types which may also be given.
-
-             | OccursE (Ty Id)
-            -- ^ When unifying a variable with a type, we found the variable
-            -- within the type (A cycle was detected in the occurs check). The
-            -- type containing the cycle is given with cyclic components
-            -- replaced with a special '*' variable.
+             | UnificationE
+            -- ^ Could not unify two types.
 
              | CtxE String (Located TyError)
             -- ^ Adds context to an error in the form of a label and a location.
@@ -100,20 +92,8 @@ printError fname input (CtxE root chain@(L rootSp _)) = do
     unwind _ (L _ (UnboundVarE x))          = indentS 1 $ "Unbound variable '" ++ x ++ "'."
     unwind _ (L _ (DeferE x))               = do
       indentS 1 $ "Deferred because of an error found whilst checking '" ++ x ++ "'."
-    unwind _ (L _ (OccursE t))              = do
-      indentS 1 "Attempted to construct an infinite type!"
-      indentS 2 $ show t
-    unwind _ (L _ (UnificationE te ta ctx)) = do
-      indentS 1 "Failed to unify types:"
-      indentS 2 $ "Expected: " ++ show te
-      indentS 2 $ "Actual:   " ++ show ta
-      case ctx of
-        Nothing -> return ()
-        Just (pte, pta) -> do
-          newLine
-          indentS 1 "Whilst trying to unify:"
-          indentS 2 $ "          " ++ show pte
-          indentS 2 $ "    with: " ++ show pta
+    unwind _ (L _  UnificationE) = do
+      indentS 1 "Failed to unify types."
 
     unwind _ (L sp (CtxE lbl (L sp' (CtxE lbl' le@(L sp'' _)))))
       | sp == sp' = do

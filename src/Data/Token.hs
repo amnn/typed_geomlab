@@ -1,6 +1,6 @@
 module Data.Token where
 
-import qualified Data.HashMap  as H
+import qualified Data.HashMap.Strict as H
 import           Data.Location
 
 type Id = String
@@ -96,7 +96,7 @@ fixPrec (Op i (Op j ll lr) r)
 fixPrec x = x
 
 -- | A map from identifiers to reserved keywords in the language.
-kws :: H.Map String Token
+kws :: H.HashMap String Token
 kws = H.fromList (keywords ++ binOps ++ monOps)
   where
     unwrap kw    = (show kw, kw)

@@ -10,57 +10,103 @@ module Infer.TypeFactory where
 
 import           Control.Monad.Reader
 import           Control.Monad.ST.Class
-import           Data.Char              (chr, ord)
+import           Data.Flag
+import qualified Data.HashMap.Strict    as H
 import           Data.Monad.DynArray
 import           Data.Monad.State
 import           Data.Monad.Type
-import           Data.Token             (Id)
-import           Data.Type
 import           Infer.Monad
 
 -- | Introduce a new local variable to the stack, and return a reference to it.
-pushLocal :: MonadInfer m => m (TyRef (World m))
+pushLocal :: MonadInferTop m => m (TyRef (World m))
 pushLocal = do
   tyCtx <- getTyCtx
   tr    <- newVar
-  liftST $ push tyCtx tr
+  liftST (push tyCtx tr)
   return tr
 
 -- | Remove the top-most local variable from the stack.
-popLocal :: MonadInfer m => m ()
+popLocal :: MonadInferTop m => m ()
 popLocal = getTyCtx >>= liftST . pop
 
--- | Produce a unique variable name.
-fresh :: MonadInfer m => m Id
+-- | Produce a unique type id
+fresh :: MonadInferTop m => m Int
 fresh = do
   SS {gsRef}     <- ask
   GS {nextTyVar} <- readIRef gsRef
   modifyIRef gsRef bumpVar
-  return (toId nextTyVar)
+  return nextTyVar
   where
     bumpVar is@GS {nextTyVar = n} = is {nextTyVar = n + 1}
 
-    a = ord 'a'
-    toId x
-      | x < 26    = [chr (a + x)]
-      | otherwise = 't' : show (x - 26)
+-- | Create the subtype for the given constructor of a Remy encoding with fresh
+-- variables and flag parameters.
+freshSub :: MonadInferTop m => Flag -> Ctr -> m (Sub (World m))
+freshSub flg ctr = Sub flg <$> replicateM (arity ctr) newVar
 
 -- | Create a new type at the current level, from the structure provided.
-newTy :: MonadInfer m
-      => TyB (StratV (World m)) (TyRef (World m))
+newTy :: MonadInferTop m
+      => H.HashMap Ctr (Sub (World m))
       -- ^ The structure of the type
       -> m (TyRef (World m))
       -- ^ A reference to a type with the given structure, created at the
       -- current level.
 
-newTy t = do
+newTy subs = do
   lvl <- getCurrLvl
-  newIRef $ StratTy { ty = t, newLevel = Set (Lvl lvl), oldLevel = Lvl lvl }
+  uid <- fresh
+  newIRef $ Ty { uid      = uid
+               , subs     = subs
+               , newLevel = Set (Lvl lvl)
+               , oldLevel = Lvl lvl
+               }
 
 -- | Create a new type at the generic level, from the structure provided.
-genTy :: MonadST m => TyB (StratV (World m)) (TyRef (World m)) -> m (TyRef (World m))
-genTy t = newIRef $ StratTy { ty = t, newLevel = Set Gen, oldLevel = Gen }
+genTy :: MonadInferTop m
+      => H.HashMap Ctr (Sub (World m))
+      -> m (TyRef (World m))
+genTy subs = do
+  uid <- fresh
+  newIRef $ Ty { uid      = uid
+               , subs     = subs
+               , newLevel = Set Gen
+               , oldLevel = Gen
+               }
 
--- | Create a fresh type variable at the current level.
-newVar :: MonadInfer m => m (TyRef (World m))
-newVar = fresh >>= newTy . VarTB . FreeV
+-- | Create a new variable at the current level.
+newVar :: MonadInferTop m
+       => m (TyRef (World m))
+newVar = freshSub dontCare Any >>= newTy . H.singleton Any
+
+-- | Superset encoding for a single constructor.
+sup :: MonadInferTop m => Ctr -> m (H.HashMap Ctr (Sub (World m)))
+sup ctr = do
+  anyS <- freshSub dontCare Any
+  ctrS <- freshSub must ctr
+  return $ H.fromList [(Any, anyS), (ctr, ctrS)]
+
+-- | Subset encoding for a single constructor.
+sub :: MonadInferTop m => Ctr -> m (H.HashMap Ctr (Sub (World m)))
+sub ctr = do
+  anyS <- freshSub mustNot Any
+  ctrS <- freshSub dontCare ctr
+  return $ H.fromList [(Any, anyS), (ctr, ctrS)]
+
+setSub :: MonadInferTop m => TyRef (World m) -> Ctr -> Sub (World m) -> m ()
+setSub _tr ctr s = do
+  _tr <- repr _tr
+  t@Ty {subs} <- readIRef _tr
+  writeIRef _tr t { subs = H.insert ctr s subs}
+
+getSub :: MonadInferTop m => TyRef (World m) -> Ctr -> m (Sub (World m))
+getSub tr ctr = do
+  Ty {subs} <- readIRef =<< repr tr
+  case H.lookup ctr subs of
+    Just s  -> return s
+    Nothing -> do
+      flg <- case wildcard ctr of
+               Nothing   -> return dontCare
+               Just wCtr -> flag <$> getSub tr wCtr
+      s   <- freshSub flg ctr
+      setSub tr ctr s
+      return s

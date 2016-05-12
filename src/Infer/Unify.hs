@@ -1,5 +1,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE NamedFieldPuns   #-}
+{-# LANGUAGE TupleSections    #-}
 
 {-|
 
@@ -10,16 +11,19 @@ module Infer.Unify where
 
 import           Control.Monad.Except
 import           Control.Monad.ST.Class
-import           Data.Foldable          (toList)
+import           Data.Flag
 import           Data.Function          (on)
+import qualified Data.HashMap.Strict    as H
 import           Data.Monad.State       ()
 import           Data.Monad.Type
-import           Data.Structure
+import qualified Data.Set               as S
 import           Data.TyError
-import           Data.Type
 import           Infer.Levels
 import           Infer.Monad
-import           Infer.TypeMarshal
+import           Infer.TypeFactory
+
+frontier :: H.HashMap Ctr a -> H.HashMap Ctr a -> S.Set Ctr
+frontier = S.union `on` (S.fromList . H.keys)
 
 -- | Update the level of a type reference, or register the reference to have its
 -- level updated eventually. Level changes are made in response to unification:
@@ -28,23 +32,20 @@ import           Infer.TypeMarshal
 -- higher scope, and so should not be generalised at the lower scope.
 updateLevel :: MonadInfer m => Level -> TyRef (World m) -> m ()
 updateLevel lvl tr = do
-  StratTy{ty, newLevel, oldLevel} <- readIRef tr
-  case ty of
-    VarTB (FreeV _)
-      | Set lvl'@(Lvl _) <- newLevel ->
-        when (lvl < lvl') $ setLevel tr $ Set lvl
+  Ty {subs, newLevel, oldLevel} <- readIRef tr
+  case newLevel of
+    Marked _ -> return ()
 
-    _ | Set lvl'@(Lvl _) <- newLevel
-      , length ty == 0 ->
-        when (lvl < lvl') $ setLevel tr $ Set lvl
+    Set lvl'@(Lvl _)
+      | length (allChildren subs) == 0 ->
+          when (lvl < lvl') $ setLevel tr $ Set lvl
 
-    _ | Marked _         <- newLevel -> throwError . OccursE =<< resolveTyRef tr
-    _ | Set lvl'@(Lvl _) <- newLevel -> do
-        when (lvl < lvl') $ do
-          when (lvl' == oldLevel) $ do
-            delayLevelUpdate tr
-          setLevel tr $ Set lvl
-        return ()
+      | otherwise -> do
+      when (lvl < lvl') $ do
+        when (lvl' == oldLevel) $ do
+          delayLevelUpdate tr
+        setLevel tr $ Set lvl
+      return ()
 
     _ -> error "updateLevel: cannot update level"
 
@@ -62,40 +63,22 @@ unify _tr _ur = do
   if _tr == _ur
   then return ()
   else do
-    StratTy{ty = tyT, newLevel = lvlT} <- readIRef _tr
-    StratTy{ty = tyU, newLevel = lvlU} <- readIRef _ur
-    case (lvlT, lvlU) of
-      (Set lt, Set lu) ->
-        case (tyT, tyU) of
-          (VarTB _, VarTB _)
-            | lt < lu           -> link _tr _ur
-            | otherwise         -> link _ur _tr
-          (VarTB _, _)          -> updateLevel lt _ur >> link _ur _tr
-          (_, VarTB _)          -> updateLevel lu _tr >> link _tr _ur
-          _ | tyT `shapeEq` tyU -> do
-            let minLvl = lt `min` lu
-            mapM_ (markTy 0) [_tr, _ur]
-            unifySub minLvl tyT tyU
-            mapM_ (flip setLevel $ Set minLvl) [_tr, _ur]
-          _ -> do
-            [te, ta] <- mapM resolveTyRef [_tr, _ur]
-            throwError $ UnificationE te ta Nothing
-      (Marked _, _) -> throwError . OccursE =<< resolveTyRef _tr
-      (_, Marked _) -> throwError . OccursE =<< resolveTyRef _ur
+    Ty {subs = subT, newLevel = Set lt} <- readIRef _tr
+    Ty {subs = subU, newLevel = Set lu} <- readIRef _ur
+    let ctrs = S.toList (frontier subT subU)
+    subPairs <- mapM (subPair _tr _ur) ctrs
+    writeIRef _ur (Fwd _tr)
+    updateLevel (lt `min` lu) _tr
+    mapM_ (unifySub _tr) subPairs
   where
-    link vr wr = do
-      modifyIRef wr $ \st -> st{ty = VarTB (FwdV vr)}
+    subPair _tr _ur ctr = (ctr,,) <$> getSub _tr ctr <*> getSub _ur ctr
 
-    unifySub l u v =
-      let recur = sequence_ $ (zipWith (unifyLev l) `on` toList) u v
-      in  catchError recur addUnifyCtx
+    unifyChildren = zipWith unify `on` children
 
-    unifyLev l vr wr = do
-      vp <- repr vr
-      updateLevel l vp
-      unify vp wr
-
-    addUnifyCtx (UnificationE te ta _) = do
-      [pte, pta] <- mapM resolveTyRef [_tr, _ur]
-      throwError $ UnificationE te ta (Just (pte, pta))
-    addUnifyCtx e = throwError e
+    unifySub _tr (ctr, tSub, uSub) = do
+      let flg = flag tSub /\ flag uSub
+      if flg == inconsistent then
+        throwError UnificationE
+      else do
+        setSub _tr ctr (tSub { flag = flg })
+        sequence_ (unifyChildren tSub uSub)

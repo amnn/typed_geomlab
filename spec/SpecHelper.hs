@@ -7,7 +7,7 @@ module SpecHelper
        , locParseFile
        , desugarFile
        , locDesugarFile
-       , typeCheckFile
+       --, typeCheckFile
        , annL
        ) where
 
@@ -19,11 +19,8 @@ import           Data.Location
 import           Data.Sugar                 hiding (stripLoc)
 import qualified Data.Sugar                 as S (stripLoc)
 import           Data.Token
-import           Data.TyError
-import           Data.Type                  (Ty, alphaEq)
 import           Desugar                    (desugarExpr)
 import           GLParser                   (parseExpr)
-import           Infer                      (typeCheck)
 import           Lexer
 import           Prelude                    hiding (Foldable)
 import           Test.Hspec
@@ -47,6 +44,7 @@ desugarFile = testFile "desugars" (==) desugar
 locDesugarFile :: FilePath -> [Para Expr] -> Spec
 locDesugarFile = testFile "located desugars" (==) locDesugar
 
+{-
 typeCheckFile :: FilePath -> [Para (Either TyError (Ty Id))] -> Spec
 typeCheckFile = testFile "type checks" paraEq tc
   where
@@ -59,6 +57,7 @@ typeCheckFile = testFile "type checks" paraEq tc
     eitherEq (Right u) (Right v) = alphaEq u v
     eitherEq (Left  e) (Left  f) = e == f
     eitherEq _         _         = False
+-}
 
 annL :: (Located a -> b) -> Span -> a -> b
 annL f s = f . L s
@@ -101,10 +100,12 @@ locDesugar input = return (runAlex input pAndDExpr)
   where
     pAndDExpr = map (fmap desugarExpr) <$> parseExpr
 
+{-
 tc :: BS.ByteString -> Result ([Para (Either TyError (Ty Id))])
 tc input = return (runAlex input pDAndTCExpr)
   where
     pDAndTCExpr = typeCheck . map (fmap desugarExpr) <$> parseExpr
+-}
 
 testFile :: Show a
          => String

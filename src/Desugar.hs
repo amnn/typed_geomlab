@@ -5,7 +5,7 @@ import           Control.Applicative   ((<|>))
 import           Data.Expr
 import           Data.Function         (on)
 import           Data.Functor.Foldable
-import qualified Data.HashMap          as H
+import qualified Data.HashMap.Strict   as H
 import           Data.List             (groupBy, sortBy)
 import           Data.Literal
 import           Data.Maybe            (catMaybes)
@@ -18,7 +18,7 @@ import           Data.Token            (Id)
 -- within a particular scope.
 type Ix a = Int
          -- ^ The level at which this floating term is being inserted.
-         -> H.Map Id Int
+         -> H.HashMap Id Int
          -- ^ A mapping from the identifiers of currently bound variables to the
          -- levels in the AST they were bound at.
          -> a
