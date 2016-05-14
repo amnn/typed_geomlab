@@ -23,6 +23,8 @@ import           Data.Monad.Type
 import           Data.Patt
 import           Data.Sugar
 import           Data.TyError
+import           Debug.Trace            (traceM)
+import           Infer.Debug            (showTyRef)
 import           Infer.Generalise
 import           Infer.Monad
 import           Infer.TypeFactory
@@ -143,7 +145,7 @@ typeCheck ps = runST $ flip runReaderT undefined $ do
       modify (H.insert x Nothing)
       throwError e
 
-    tcPara (Eval e)  = fmap Eval . topScope $ get >>= flip typeOf e >> return ()
+    tcPara (Eval e)  = fmap Eval . topScope $ get >>= flip typeOf e >>=  showTyRef >>= traceM
     tcPara (Def x e) = fmap (Def x)
                      . topScope
                      . guardTy x $ do
@@ -154,4 +156,4 @@ typeCheck ps = runST $ flip runReaderT undefined $ do
         topCtx e $ unify evr etr
         return evr
       generalise dtr
-      return ()
+      traceM =<< showTyRef dtr

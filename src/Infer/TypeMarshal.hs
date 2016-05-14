@@ -10,7 +10,6 @@ module Infer.TypeMarshal where
 
 import           Control.Monad.ST.Class
 import           Control.Monad.State
-import           Data.Flag
 import qualified Data.HashMap.Strict    as H
 import           Data.Monad.State
 import           Data.Monad.Type        (Sub(..))
@@ -22,16 +21,40 @@ import           Infer.TypeFactory
 -- | From a type tree, create a Remy type at the "general" level, for the subset
 -- of the given type.
 loadTy :: MonadInferTop m => T.Ty -> m (MT.TyRef (World m))
-loadTy ty = evalStateT (ldSub ty) H.empty
+loadTy ty = evalStateT (ldSup ty) H.empty
   where
     lookupVar v = do
       subst <- get
       case H.lookup v subst of
         Just vr -> return vr
         Nothing -> do
-          vr <- genTy . Just . H.singleton MT.Any =<< freshSub dontCare MT.Any
+          vr <- genTy Nothing
           put (H.insert v vr subst)
           return vr
+
+    ldSup (T.VarT v)    = lookupVar v
+    ldSup  T.BoolT      = sup  MT.Bool   >>= genTy
+    ldSup  T.NumT       = sup  MT.Num    >>= genTy
+    ldSup  T.StrT       = sup  MT.Str    >>= genTy
+    ldSup  T.AtomT      = sup  MT.Atom   >>= genTy
+    ldSup  T.NilT       = sup  MT.Nil    >>= genTy
+    ldSup (T.TagT t)    = sup (MT.Tag t) >>= genTy
+
+    ldSup (T.ConsT a b) = do
+      tr  <- genTy =<< sup MT.Cons
+      crs <- mapM ldSup [a, b]
+      s   <- getSub tr MT.Cons
+      setSub tr MT.Cons s { children = crs }
+      return tr
+
+    ldSup (T.ArrT as b) = do
+      let ctr = MT.Fn (length as)
+      tr   <- genTy =<< sub ctr
+      atrs <- mapM ldSub as
+      btr  <- ldSup b
+      s    <- getSub tr ctr
+      setSub tr ctr s { children = btr:atrs}
+      return tr
 
     ldSub (T.VarT v)    = lookupVar v
     ldSub  T.BoolT      = sub  MT.Bool   >>= genTy
@@ -53,30 +76,6 @@ loadTy ty = evalStateT (ldSub ty) H.empty
       tr   <- genTy =<< sub ctr
       atrs <- mapM ldSup as
       btr  <- ldSub b
-      s    <- getSub tr ctr
-      setSub tr ctr s { children = btr:atrs}
-      return tr
-
-    ldSup (T.VarT v)    = lookupVar v
-    ldSup  T.BoolT      = sup  MT.Bool   >>= genTy
-    ldSup  T.NumT       = sup  MT.Num    >>= genTy
-    ldSup  T.StrT       = sup  MT.Str    >>= genTy
-    ldSup  T.AtomT      = sup  MT.Atom   >>= genTy
-    ldSup  T.NilT       = sup  MT.Nil    >>= genTy
-    ldSup (T.TagT t)    = sup (MT.Tag t) >>= genTy
-
-    ldSup (T.ConsT a b) = do
-      tr  <- genTy =<< sup MT.Cons
-      crs <- mapM ldSup [a, b]
-      s   <- getSub tr MT.Cons
-      setSub tr MT.Cons s { children = crs }
-      return tr
-
-    ldSup (T.ArrT as b) = do
-      let ctr = MT.Fn (length as)
-      tr   <- genTy =<< sub ctr
-      atrs <- mapM ldSup as
-      btr  <- ldSup b
       s    <- getSub tr ctr
       setSub tr ctr s { children = btr:atrs}
       return tr
