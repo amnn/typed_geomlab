@@ -129,8 +129,8 @@ BinOpNoMinus : '+'   { ident $1 }
 
 Factor ::             { Located Sugar }
 Factor : Primary      { $1 }
-       | monop Factor { apply (ident $1) [$2] }
-       | '-' Factor   { apply ($1 *> pure "~") [$2] }
+       | monop Factor { reify "function application" $ apply (ident $1) [$2] }
+       | '-' Factor   { reify "function application" $ apply ($1 *> pure "~") [$2] }
 
 Primary ::                          { Located Sugar }
 Primary : num                       { val $1 }
@@ -138,7 +138,7 @@ Primary : num                       { val $1 }
         | str                       { val $1 }
         | ident                     { val $1 }
 
-        | ident '(' Actuals ')'     { apply (ident $1) (reverse $3) <* $4 }
+        | ident '(' Actuals ')'     { reify "function application" $ apply (ident $1) (reverse $3) <* $4 }
 
         | '[' ListExpr ']'          { reify (fst $2) $ $1 *> snd $2 <* $3 }
         | '(' monop ')'             { $1 *> val $2 <* $3 }
@@ -248,11 +248,8 @@ reifyList lss  = enlist <@> loc (zipWith (reifyOrd "element") [s,s-1..1] lss)
     s = length lss
 
 apply :: Located Id -> [Located Sugar] -> Located Sugar
-apply x [y] = reify "function application" $
-                AppS <@> x <*> loc [reify "argument" y]
-
-apply x xs  = reify "function application" $
-                AppS <@> x <*> loc (zipWith (reifyOrd "argument") [1..] xs)
+apply x [y] = AppS <@> x <*> loc [reify "argument" y]
+apply x xs  = AppS <@> x <*> loc (zipWith (reifyOrd "argument") [1..] xs)
 
 isLSect :: Sugar -> Bool
 isLSect (LSectS _ _)     = True
