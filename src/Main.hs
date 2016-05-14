@@ -109,9 +109,19 @@ processArg fname = do
         inFaint (putStrLn "Raw Error\n")
         liftIO $ print e >> putStrLn ""
 
-    disp :: BS.ByteString -> Int -> Para (Either TyError ()) -> StateT Opt IO Int
-    disp _   d (Def x (Right ())) = inGreen (putStrLn $ x ++ " :: checks!") >> return d
-    disp _   d (Eval  (Right ())) = inGreen (putStrLn "checks!") >> return d
+    disp :: BS.ByteString -> Int -> Para (Either TyError String) -> StateT Opt IO Int
+    disp _   d (Def x (Right ty)) = do
+      inGreen $ do
+        putStrLn $ x ++ " :: checks!"
+        putStrLn ty
+      return d
+
+    disp _   d (Eval  (Right ty)) = do
+      inGreen $ do
+        putStrLn "checks!"
+        putStrLn ty
+      return d
+
     disp raw d (Def _ (Left e))  = rawErr e >> err raw d e
     disp raw d (Eval  (Left e))  = rawErr e >> err raw d e
 

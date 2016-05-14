@@ -23,7 +23,6 @@ import           Data.Monad.Type
 import           Data.Patt
 import           Data.Sugar
 import           Data.TyError
-import           Debug.Trace            (traceM)
 import           Infer.Debug            (showTyRef)
 import           Infer.Generalise
 import           Infer.Monad
@@ -125,7 +124,7 @@ typeOf gloDefs = check
 
 -- | Given a list of top-level statements, type check each one individually and
 -- give the type or error for each top-level operation.
-typeCheck :: [Para Expr] -> [Para (Either TyError ())]
+typeCheck :: [Para Expr] -> [Para (Either TyError String)]
 typeCheck ps = runST $ flip runReaderT undefined $ do
   tyCtx <- liftST  $ newArray_ 4
   gsRef <- newIRef $ GS {tyCtx, waitingToAdjust = [], nextTyVar = 0 }
@@ -145,7 +144,10 @@ typeCheck ps = runST $ flip runReaderT undefined $ do
       modify (H.insert x Nothing)
       throwError e
 
-    tcPara (Eval e)  = fmap Eval . topScope $ get >>= flip typeOf e >>=  showTyRef >>= traceM
+    tcPara (Eval e)  = fmap Eval . topScope $ get
+                                          >>= flip typeOf e
+                                          >>= showTyRef
+
     tcPara (Def x e) = fmap (Def x)
                      . topScope
                      . guardTy x $ do
@@ -156,4 +158,4 @@ typeCheck ps = runST $ flip runReaderT undefined $ do
         topCtx e $ unify evr etr
         return evr
       generalise dtr
-      traceM =<< showTyRef dtr
+      showTyRef dtr
