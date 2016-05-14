@@ -77,8 +77,8 @@ repr :: MonadInferTop m => TyRef (World m) -> m (TyRef (World m))
 repr tr = do
   ty <- readIRef tr
   case ty of
-    Fwd _tr -> do
-      _tr <- repr _tr
-      writeIRef _tr $ Fwd _tr
-      return _tr
+    Fwd _pr -> do
+      _pr <- repr _pr
+      writeIRef tr $ Fwd _pr
+      return _pr
     _ -> return tr

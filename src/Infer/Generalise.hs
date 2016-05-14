@@ -75,16 +75,18 @@ instantiate :: MonadInfer m => TyRef (World m) -> m (TyRef (World m))
 instantiate tRef = evalStateT (inst tRef) H.empty
   where
     inst tr = do
-      Ty {uid, subs, newLevel = Set lvl} <- readIRef =<< repr tr
+      Ty {uid, subs, newLevel} <- readIRef =<< repr tr
       subst <- get
       case H.lookup uid subst of
         Just tr' -> return tr'
-        Nothing | Gen <- lvl -> do
-          nr <- newTy H.empty
+        Nothing
+          | Set Gen <- newLevel -> do
+          nr <- newTy (Just H.empty)
           put (H.insert uid nr subst)
-          nSubs <- mapM instSub subs
+          nSubs <- mapM (mapM instSub) subs
           modifyIRef nr $ \t -> t {subs = nSubs}
           return nr
+          | Marked _ <- newLevel -> error "instantiate: Marked level!"
         _ -> return tr
 
     instSub s@Sub {children} = do

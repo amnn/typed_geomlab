@@ -62,7 +62,7 @@ typeOf gloDefs = check
 
       -- Build constraints
       notAny <- freshSub mustNot Any
-      let constraints = H.fromList $ (Any, notAny):pats
+      let constraints = Just . H.fromList $ (Any, notAny):pats
 
       -- Constrain type of case argument
       etr <- check e

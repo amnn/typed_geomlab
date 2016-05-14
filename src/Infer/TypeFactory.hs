@@ -8,6 +8,7 @@ Ways to build types as represented internally by the type checker.
 |-}
 module Infer.TypeFactory where
 
+import           Control.Applicative    ((<|>))
 import           Control.Monad.Reader
 import           Control.Monad.ST.Class
 import           Data.Flag
@@ -46,7 +47,7 @@ freshSub flg ctr = Sub flg <$> replicateM (arity ctr) newVar
 
 -- | Create a new type at the current level, from the structure provided.
 newTy :: MonadInferTop m
-      => H.HashMap Ctr (Sub (World m))
+      => Maybe (H.HashMap Ctr (Sub (World m)))
       -- ^ The structure of the type
       -> m (TyRef (World m))
       -- ^ A reference to a type with the given structure, created at the
@@ -63,7 +64,7 @@ newTy subs = do
 
 -- | Create a new type at the generic level, from the structure provided.
 genTy :: MonadInferTop m
-      => H.HashMap Ctr (Sub (World m))
+      => Maybe (H.HashMap Ctr (Sub (World m)))
       -> m (TyRef (World m))
 genTy subs = do
   uid <- fresh
@@ -76,32 +77,34 @@ genTy subs = do
 -- | Create a new variable at the current level.
 newVar :: MonadInferTop m
        => m (TyRef (World m))
-newVar = freshSub dontCare Any >>= newTy . H.singleton Any
+newVar = newTy Nothing
 
 -- | Superset encoding for a single constructor.
-sup :: MonadInferTop m => Ctr -> m (H.HashMap Ctr (Sub (World m)))
+sup :: MonadInferTop m => Ctr -> m (Maybe (H.HashMap Ctr (Sub (World m))))
 sup ctr = do
   anyS <- freshSub dontCare Any
   ctrS <- freshSub must ctr
-  return $ H.fromList [(Any, anyS), (ctr, ctrS)]
+  return . Just . H.fromList $ [(Any, anyS), (ctr, ctrS)]
 
 -- | Subset encoding for a single constructor.
-sub :: MonadInferTop m => Ctr -> m (H.HashMap Ctr (Sub (World m)))
+sub :: MonadInferTop m => Ctr -> m (Maybe (H.HashMap Ctr (Sub (World m))))
 sub ctr = do
   anyS <- freshSub mustNot Any
   ctrS <- freshSub dontCare ctr
-  return $ H.fromList [(Any, anyS), (ctr, ctrS)]
+  return . Just . H.fromList $ [(Any, anyS), (ctr, ctrS)]
 
 setSub :: MonadInferTop m => TyRef (World m) -> Ctr -> Sub (World m) -> m ()
 setSub _tr ctr s = do
   _tr <- repr _tr
   t@Ty {subs} <- readIRef _tr
-  writeIRef _tr t { subs = H.insert ctr s subs}
+  writeIRef _tr t { subs = (H.insert ctr s <$> subs)
+                       <|> pure (H.singleton ctr s)
+                  }
 
 getSub :: MonadInferTop m => TyRef (World m) -> Ctr -> m (Sub (World m))
 getSub tr ctr = do
   Ty {subs} <- readIRef =<< repr tr
-  case H.lookup ctr subs of
+  case H.lookup ctr =<< subs of
     Just s  -> return s
     Nothing -> do
       flg <- case wildcard ctr of

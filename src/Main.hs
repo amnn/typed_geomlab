@@ -3,18 +3,16 @@ module Main where
 
 import           Control.Monad.State
 import qualified Data.ByteString.Lazy.Char8 as BS
+import qualified Data.Expr                  as E (stripLoc)
+import           Data.Sugar                 hiding (stripLoc)
+import qualified Data.Sugar                 as S (stripLoc)
+import           Data.TyError
 import           Desugar                    (desugarExpr)
-import qualified Expr                       as E (stripLoc)
 import           GLParser                   (parseExpr)
 import           Infer                      (typeCheck)
 import           Lexer
-import           Sugar                      hiding (stripLoc)
-import qualified Sugar                      as S (stripLoc)
 import           System.Console.ANSI
 import           System.Environment
-import           Token
-import           TyError
-import           Type
 
 data Opt = Opt { showRaw      :: !Bool
                , showSugar    :: !Bool
@@ -111,9 +109,9 @@ processArg fname = do
         inFaint (putStrLn "Raw Error\n")
         liftIO $ print e >> putStrLn ""
 
-    disp :: BS.ByteString -> Int -> Para (Either TyError (Ty Id)) -> StateT Opt IO Int
-    disp _   d (Def x (Right t)) = inGreen (putStrLn $ x ++ " :: " ++ show t) >> return d
-    disp _   d (Eval  (Right t)) = inGreen (putStrLn $ show t) >> return d
+    disp :: BS.ByteString -> Int -> Para (Either TyError ()) -> StateT Opt IO Int
+    disp _   d (Def x (Right ())) = inGreen (putStrLn $ x ++ " :: checks!") >> return d
+    disp _   d (Eval  (Right ())) = inGreen (putStrLn "checks!") >> return d
     disp raw d (Def _ (Left e))  = rawErr e >> err raw d e
     disp raw d (Eval  (Left e))  = rawErr e >> err raw d e
 

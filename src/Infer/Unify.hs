@@ -37,7 +37,7 @@ updateLevel lvl tr = do
     Marked _ -> return ()
 
     Set lvl'@(Lvl _)
-      | length (allChildren subs) == 0 ->
+      | null (allChildren subs) ->
           when (lvl < lvl') $ setLevel tr $ Set lvl
 
       | otherwise -> do
@@ -60,17 +60,21 @@ unify :: MonadInfer m
 
 unify _tr _ur = do
   [_tr, _ur] <- mapM repr [_tr, _ur]
-  if _tr == _ur
-  then return ()
-  else do
+  when (_tr /= _ur) $ do
     Ty {subs = subT, newLevel = Set lt} <- readIRef _tr
     Ty {subs = subU, newLevel = Set lu} <- readIRef _ur
-    let ctrs = S.toList (frontier subT subU)
-    subPairs <- mapM (subPair _tr _ur) ctrs
-    writeIRef _ur (Fwd _tr)
-    updateLevel (lt `min` lu) _tr
-    mapM_ (unifySub _tr) subPairs
+    case (subT, subU) of
+      (Nothing, _) -> _tr ~> _ur
+      (_, Nothing) -> _ur ~> _tr
+      (Just st, Just su) -> do
+        let ctrs = S.toList (frontier st su)
+        subPairs <- mapM (subPair _tr _ur) ctrs
+        _ur ~> _tr
+        updateLevel (lt `min` lu) _tr
+        mapM_ (unifySub _tr) subPairs
   where
+    _ur ~> _tr = writeIRef _ur (Fwd _tr)
+
     subPair _tr _ur ctr = (ctr,,) <$> getSub _tr ctr <*> getSub _ur ctr
 
     unifyChildren = zipWith unify `on` children

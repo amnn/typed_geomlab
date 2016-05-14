@@ -43,11 +43,11 @@ data Level = Lvl Int | Gen deriving (Eq, Show, Ord)
 data Marked a = Set a | Marked !Int deriving (Eq, Show)
 
 -- | Remy encoding of types
-data Ty s = Ty { uid      :: !Int
-               , subs     :: H.HashMap Ctr (Sub s)
-               , newLevel :: !(Marked Level)
-               , oldLevel :: !Level
-               }
+data Ty s = Ty  { uid      :: !Int
+                , subs     :: Maybe (H.HashMap Ctr (Sub s))
+                , newLevel :: !(Marked Level)
+                , oldLevel :: !Level
+                }
           | Fwd (TyRef s)
             deriving Eq
 
@@ -76,5 +76,5 @@ arity  Cons    = 2
 arity (Fn aty) = aty + 1
 arity  _       = 0
 
-allChildren :: H.HashMap Ctr (Sub s) -> [TyRef s]
-allChildren = H.elems >=> children
+allChildren :: Maybe (H.HashMap Ctr (Sub s)) -> [TyRef s]
+allChildren = maybe [] (H.elems >=> children)

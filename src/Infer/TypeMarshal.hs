@@ -29,7 +29,7 @@ loadTy ty = evalStateT (ldSub ty) H.empty
       case H.lookup v subst of
         Just vr -> return vr
         Nothing -> do
-          vr <- genTy . H.singleton MT.Any =<< freshSub dontCare MT.Any
+          vr <- genTy . Just . H.singleton MT.Any =<< freshSub dontCare MT.Any
           put (H.insert v vr subst)
           return vr
 
