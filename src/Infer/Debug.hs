@@ -36,8 +36,8 @@ showTyRef _tr = evalStateT ((start++) <$> p [_tr]) S.empty
        let line = show uid ++ ": " ++ intercalate " " subInfos ++ "\n"
        (line++) <$> p (allChildren subs ++ rs)
 
-    getSub (ctr, (Sub flg cs)) = do
+    getSub (ctr, (Sub _ cs)) = do
       uids <- mapM getUID cs
-      return $ show ctr ++ show flg ++ "(" ++ intercalate ", " uids ++ ")"
+      return $ show ctr ++ "(" ++ intercalate ", " uids ++ ")"
 
     getUID = repr >=> readIRef >=> pure . show . uid

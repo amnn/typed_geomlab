@@ -9,7 +9,7 @@ Flag Tree operations.
 |-}
 module Infer.FlagTree where
 
-import           Control.Monad          (foldM)
+import           Control.Monad          (foldM, when)
 import           Control.Monad.ST.Class
 import           Data.Constructor
 import           Data.Flag
@@ -55,14 +55,19 @@ specialise ctx flg@FT {caseArg, arms, interp} = do
       | otherwise                     -> return (FL interp)
 
 merge :: MonadInferTop m
-      =>    FlagTree (World m)
+      =>    TyRef    (World m)
+      -- ^ The type reference owning the flag.
+      ->    FlagTree (World m)
       ->    FlagTree (World m)
       -> m (FlagTree (World m))
 
-merge   (FL i) (FL j) = return (FL (i /\ j))
-merge f@(FL _)  g     = merge g f
+merge tr   (FL i) (FL j) = do
+  let i' = i /\ j
+  when (i' == inconsistent) $ addSuspect tr
+  return (FL i')
+merge tr f@(FL _)  g     = merge tr g f
 
-merge f@FT {caseArg, arms, interp} g = do
+merge tr f@FT {caseArg, arms, interp} g = do
   _cr        <- repr caseArg
   Ty {uid}   <- readIRef _cr
   gCases     <- cases _cr g
@@ -75,19 +80,21 @@ merge f@FT {caseArg, arms, interp} g = do
 
     newArm uid ctr = do
       gArm <- specialise (H.singleton uid ctr) g
-      merge (lookupArm ctr) gArm
+      merge tr (lookupArm ctr) gArm
 
 decorrelate :: MonadInferTop m
             =>    TyRef    (World m)
+            -- ^ Type reference owning the flag
+            ->    TyRef    (World m)
+            -- ^ Type reference to decorrelate w.r.t.
             ->    FlagTree (World m)
             -> m (FlagTree (World m))
 
-decorrelate _   f@FL {} = return f
-
-decorrelate _tr f@FT {caseArg, arms} = do
-  arms' <- traverse (decorrelate _tr) arms
-  _cr   <- repr caseArg
-  if _tr == _cr then
-    foldM merge (FL dontCare) arms'
+decorrelate _   _   f@FL {}              = return f
+decorrelate _tr _cr f@FT {caseArg, arms} = do
+  arms' <- traverse (decorrelate _tr _cr) arms
+  _cr'  <- repr caseArg
+  if _cr == _cr' then
+    foldM (merge _tr) (FL dontCare) arms'
   else
     return f { arms = arms' }

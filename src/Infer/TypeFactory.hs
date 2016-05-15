@@ -17,6 +17,7 @@ import qualified Data.HashMap.Strict    as H
 import           Data.Monad.DynArray
 import           Data.Monad.State
 import           Data.Monad.Type
+import           Infer.Context
 import           Infer.Monad
 
 -- | Introduce a new local variable to the stack, and return a reference to it.
@@ -43,7 +44,7 @@ fresh = do
 
 -- | Create the subtype for the given constructor of a Remy encoding with fresh
 -- variables and flag parameters.
-freshSub :: MonadInferTop m => Flag -> Ctr -> m (Sub (World m))
+freshSub :: MonadInferTop m => FlagTree (World m) -> Ctr  -> m (Sub (World m))
 freshSub flg ctr = Sub flg <$> replicateM (arity ctr) newVar
 
 -- | Create a new type at the current level, from the structure provided.
@@ -83,15 +84,19 @@ newVar = newTy Nothing
 -- | Superset encoding for a single constructor.
 sup :: MonadInferTop m => Ctr -> m (Maybe (H.HashMap Ctr (Sub (World m))))
 sup ctr = do
-  anyS <- freshSub dontCare Any
-  ctrS <- freshSub must ctr
+  dcf  <- contextualise dontCare
+  mf   <- contextualise must
+  anyS <- freshSub dcf Any
+  ctrS <- freshSub mf  ctr
   return . Just . H.fromList $ [(Any, anyS), (ctr, ctrS)]
 
 -- | Subset encoding for a single constructor.
 sub :: MonadInferTop m => Ctr -> m (Maybe (H.HashMap Ctr (Sub (World m))))
 sub ctr = do
-  anyS <- freshSub mustNot Any
-  ctrS <- freshSub dontCare ctr
+  mnf  <- contextualise mustNot
+  dcf  <- contextualise dontCare
+  anyS <- freshSub mnf Any
+  ctrS <- freshSub dcf ctr
   return . Just . H.fromList $ [(Any, anyS), (ctr, ctrS)]
 
 setSub :: MonadInferTop m => TyRef (World m) -> Ctr -> Sub (World m) -> m ()
@@ -109,7 +114,7 @@ getSub tr ctr = do
     Just s  -> return s
     Nothing -> do
       flg <- case wildcard ctr of
-               Nothing   -> return dontCare
+               Nothing   -> return (FL dontCare)
                Just wCtr -> flag <$> getSub tr wCtr
       s   <- freshSub flg ctr
       setSub tr ctr s

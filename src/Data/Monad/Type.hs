@@ -21,10 +21,11 @@ data FlagTree s = FT { caseArg :: TyRef s
                      , arms    :: !(H.HashMap Ctr (FlagTree s))
                      , interp  :: !Flag
                      }
-                | FL { interp  :: Flag }
+                | FL { interp  :: !Flag }
+                  deriving Eq
 
 -- | An individual sub-type in the Remy encoding
-data Sub s = Sub { flag     :: !Flag
+data Sub s = Sub { flag     :: !(FlagTree s)
                  , children :: [TyRef s]
                  }
              deriving Eq
@@ -40,7 +41,7 @@ data Marked a = Set a | Marked !Int deriving (Eq, Show)
 
 -- | Remy encoding of types
 data Ty s = Ty  { uid      :: !Int
-                , subs     :: Maybe (H.HashMap Ctr (Sub s))
+                , subs     :: !(Maybe (H.HashMap Ctr (Sub s)))
                 , newLevel :: !(Marked Level)
                 , oldLevel :: !Level
                 }

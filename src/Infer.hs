@@ -67,7 +67,8 @@ typeOf gloDefs = check
       pats <- mapM (checkArm etr atr) as
 
       -- Build constraints
-      notAny <- freshSub mustNot Any
+      mnf    <- contextualise mustNot
+      notAny <- freshSub mnf Any
       let constraints = Just . H.fromList $ (Any, notAny):pats
 
       -- Constrain case argument
@@ -120,7 +121,8 @@ typeOf gloDefs = check
 
       unify btr atr
       replicateM_ (holes p) popLocal
-      return (ctr, Sub dontCare ptrs)
+      dcf <- contextualise dontCare
+      return (ctr, Sub dcf ptrs)
 
     patCtr (ValPB (NumB _))    =  Num
     patCtr (ValPB (StrB _))    =  Str

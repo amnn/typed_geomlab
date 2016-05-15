@@ -12,13 +12,12 @@ module Infer.Unify where
 import           Control.Monad.Except
 import           Control.Monad.ST.Class
 import           Data.Constructor
-import           Data.Flag
 import           Data.Function          (on)
 import qualified Data.HashMap.Strict    as H
 import           Data.Monad.State       ()
 import           Data.Monad.Type
 import qualified Data.Set               as S
-import           Data.TyError
+import           Infer.FlagTree
 import           Infer.Levels
 import           Infer.Monad
 import           Infer.TypeFactory
@@ -81,9 +80,6 @@ unify _tr _ur = do
     unifyChildren = zipWith unify `on` children
 
     unifySub _tr (ctr, tSub, uSub) = do
-      let flg = flag tSub /\ flag uSub
-      if flg == inconsistent then
-        throwError UnificationE
-      else do
-        setSub _tr ctr (tSub { flag = flg })
-        sequence_ (unifyChildren tSub uSub)
+      flag' <- merge _tr (flag tSub) (flag uSub)
+      setSub _tr ctr (tSub { flag = flag' })
+      sequence_ (unifyChildren tSub uSub)
