@@ -18,6 +18,7 @@ import           Control.Monad.State
 import           Data.Monad.DynArray
 import           Data.Monad.State
 import           Data.Monad.Type
+import qualified Data.Set               as S
 import           Data.STRef
 import           Data.TyError
 
@@ -89,3 +90,16 @@ repr tr = do
       writeIRef tr $ Fwd _pr
       return _pr
     _ -> return tr
+
+-- | Return a list of all the type references that are reachable from the given
+-- type reference.
+reachable :: MonadInferTop m => TyRef (World m) -> m [TyRef (World m)]
+reachable tr = fst <$> execStateT (go tr) ([], S.empty)
+  where
+    go _tr = do
+      _tr            <- repr _tr
+      (rs, visit)    <- get
+      Ty {uid, subs} <- readIRef _tr
+      when (S.notMember uid visit) $ do
+        put (_tr:rs, S.insert uid visit)
+        mapM_ go (allChildren subs)
