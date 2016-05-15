@@ -28,6 +28,7 @@ cases :: MonadInferTop m
       => TyRef (World m)
       -> FlagTree (World m)
       -> m (S.Set Ctr)
+
 cases _   FL {}              = return S.empty
 cases _tr FT {caseArg, arms} = do
   _cr <- repr caseArg

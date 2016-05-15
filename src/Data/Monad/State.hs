@@ -5,6 +5,7 @@ State managed by the type checker during the course of type inference.
 |-}
 module Data.Monad.State where
 
+import           Data.Constructor
 import qualified Data.HashMap.Strict as H
 import           Data.Monad.DynArray
 import           Data.Monad.Type
@@ -24,8 +25,9 @@ data GlobalState s = GS { tyCtx           :: DynArray s (TyRef s)
                         }
 
 -- | Read-only environment state. Holds the reference to the global state (which
--- never changes) and the current level, which increases as we move through more
--- @ let @ expressions.
-data ScopedState s = SS { gsRef :: GSRef s
-                        , lvl   :: !Int
+-- never changes), the current level, which increases as we move through more
+-- let expressions, and the case context, which is scoped by case expressions.
+data ScopedState s = SS { gsRef   :: GSRef s
+                        , lvl     :: !Int
+                        , context :: [(TyRef s, Ctr)]
                         }

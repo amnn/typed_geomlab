@@ -24,6 +24,7 @@ import           Data.Monad.Type
 import           Data.Patt
 import           Data.Sugar
 import           Data.TyError
+import           Infer.Context
 import           Infer.Debug            (showTyRef)
 import           Infer.Generalise
 import           Infer.Monad
@@ -58,16 +59,18 @@ typeOf gloDefs = check
       | otherwise = throwError $ UnboundVarE v
 
     check (CaseE e as) = do
+      -- Check case argument
+      etr <- check e
+
       -- Unify types of arms, gathering constraints for case argument
       atr  <- newVar
-      pats <- mapM (checkArm atr) as
+      pats <- mapM (checkArm etr atr) as
 
       -- Build constraints
       notAny <- freshSub mustNot Any
       let constraints = Just . H.fromList $ (Any, notAny):pats
 
-      -- Constrain type of case argument
-      etr <- check e
+      -- Constrain case argument
       ctr <- newTy constraints
       unify etr ctr
 
@@ -107,13 +110,17 @@ typeOf gloDefs = check
       catchError (check (dislocate le)) $ \e -> do
         throwError $ CtxE lbl (le *> pure e)
 
-    checkArm atr (p, a) = do
+    checkArm etr btr (p, a) = do
+      let ctr = patCtr p
       ptrs <- replicateM (holes p) pushLocal
-      unify atr =<< check a
-      replicateM_ (holes p) popLocal
-      return $ patSub p ptrs
 
-    patSub p cs = (patCtr p, Sub dontCare cs)
+      atr  <- case ctr of
+                Any -> check a
+                _   -> inContext etr ctr (check a)
+
+      unify btr atr
+      replicateM_ (holes p) popLocal
+      return (ctr, Sub dontCare ptrs)
 
     patCtr (ValPB (NumB _))    =  Num
     patCtr (ValPB (StrB _))    =  Str
@@ -129,7 +136,7 @@ typeCheck :: [Para Expr] -> [Para (Either TyError String)]
 typeCheck ps = runST $ flip runReaderT undefined $ do
   tyCtx <- liftST  $ newArray_ 4
   gsRef <- newIRef $ GS {tyCtx, waitingToAdjust = [], nextTyVar = 0 }
-  local (const $ SS {gsRef, lvl = 0}) $
+  local (const $ SS {gsRef, lvl = 0, context = []}) $
     evalStateT (mapM tcPara ps) =<< initialDefs
   where
 
