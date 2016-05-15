@@ -85,16 +85,16 @@ merge tr f@FT {caseArg, arms, interp} g = do
 decorrelate :: MonadInferTop m
             =>    TyRef    (World m)
             -- ^ Type reference owning the flag
-            ->    TyRef    (World m)
-            -- ^ Type reference to decorrelate w.r.t.
+            ->    S.Set Int
+            -- ^ Type uids to decorrelate w.r.t.
             ->    FlagTree (World m)
             -> m (FlagTree (World m))
 
-decorrelate _   _   f@FL {}              = return f
-decorrelate _tr _cr f@FT {caseArg, arms} = do
-  arms' <- traverse (decorrelate _tr _cr) arms
-  _cr'  <- repr caseArg
-  if _cr == _cr' then
+decorrelate _   _    f@FL {}              = return f
+decorrelate _tr uids f@FT {caseArg, arms} = do
+  arms' <- traverse (decorrelate _tr uids) arms
+  Ty {uid}  <- readIRef =<< repr caseArg
+  if S.member uid uids then
     foldM (merge _tr) (FL dontCare) arms'
   else
     return f { arms = arms' }
