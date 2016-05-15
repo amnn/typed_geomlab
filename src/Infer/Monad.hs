@@ -65,6 +65,13 @@ getTyCtx = tyCtx <$> (asks gsRef >>= readIRef)
 getLocalTy :: MonadInferTop m => Int -> m (TyRef (World m))
 getLocalTy ix = getTyCtx >>= liftST . peek ix
 
+-- | Add a type reference to the list of types suspected of causing errors.
+addSuspect :: MonadInferTop m => TyRef (World m) -> m ()
+addSuspect tr = do { gs<- asks gsRef; modifyIRef gs doAdd }
+  where
+    doAdd gs@GS {suspectTys} =
+      gs { suspectTys = tr : suspectTys }
+
 -- | Run the supplied monad in a scope nested one level below the current one.
 newScope :: MonadInferTop m => m a -> m a
 newScope = local bumpScope

@@ -20,7 +20,7 @@ import           Infer.Monad
 
 -- | Introduce a new piece of information into the case context.
 inContext :: MonadInferTop m => TyRef (World m) -> Ctr -> m a -> m a
-inContext tr ctr act = local addToCtx act
+inContext tr ctr = local addToCtx
   where
     addToCtx ss@SS {context} =
       ss { context = (tr, ctr):context }

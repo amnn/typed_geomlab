@@ -17,10 +17,11 @@ type GloDef s = H.HashMap Id (Maybe (TyRef s))
 
 -- | This state is held in a reference that is available from anywhere in the
 -- type checker. It holds the list of currently bound variables, a list of type
--- references whose levels need to be fully adjusted, and a counter used to
--- spawn new type variables.
+-- references whose levels need to be fully adjusted, a list of types that may
+-- be the source of type errors, and a counter used to spawn new type variables.
 data GlobalState s = GS { tyCtx           :: DynArray s (TyRef s)
                         , waitingToAdjust :: [TyRef s]
+                        , suspectTys      :: [TyRef s]
                         , nextTyVar       :: !Int
                         }
 

@@ -135,7 +135,11 @@ typeOf gloDefs = check
 typeCheck :: [Para Expr] -> [Para (Either TyError String)]
 typeCheck ps = runST $ flip runReaderT undefined $ do
   tyCtx <- liftST  $ newArray_ 4
-  gsRef <- newIRef $ GS {tyCtx, waitingToAdjust = [], nextTyVar = 0 }
+  gsRef <- newIRef $ GS { tyCtx
+                        , waitingToAdjust = []
+                        , suspectTys      = []
+                        , nextTyVar       = 0
+                        }
   local (const $ SS {gsRef, lvl = 0, context = []}) $
     evalStateT (mapM tcPara ps) =<< initialDefs
   where
