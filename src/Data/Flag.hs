@@ -7,8 +7,8 @@ Data structure and associated operations for working with flag parameters.
 |-}
 module Data.Flag where
 
-data Bound = MustNot| Must deriving (Eq, Ord)
-data Flag = Fl { lb, ub :: Bound } deriving Eq
+data Bound    = MustNot| Must deriving (Eq, Ord)
+data Flag     = Fl { lb, ub  :: Bound } deriving Eq
 
 instance Show Bound where
   show Must    = "+"

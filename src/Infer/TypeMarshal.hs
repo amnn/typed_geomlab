@@ -10,9 +10,10 @@ module Infer.TypeMarshal where
 
 import           Control.Monad.ST.Class
 import           Control.Monad.State
+import           Data.Constructor
 import qualified Data.HashMap.Strict    as H
 import           Data.Monad.State
-import           Data.Monad.Type        (Sub(..))
+import           Data.Monad.Type        (Sub (..))
 import qualified Data.Monad.Type        as MT
 import qualified Data.Type              as T
 import           Infer.Monad
@@ -33,22 +34,22 @@ loadTy ty = evalStateT (ldSup ty) H.empty
           return vr
 
     ldSup (T.VarT v)    = lookupVar v
-    ldSup  T.BoolT      = sup  MT.Bool   >>= genTy
-    ldSup  T.NumT       = sup  MT.Num    >>= genTy
-    ldSup  T.StrT       = sup  MT.Str    >>= genTy
-    ldSup  T.AtomT      = sup  MT.Atom   >>= genTy
-    ldSup  T.NilT       = sup  MT.Nil    >>= genTy
-    ldSup (T.TagT t)    = sup (MT.Tag t) >>= genTy
+    ldSup  T.BoolT      = sup  Bool   >>= genTy
+    ldSup  T.NumT       = sup  Num    >>= genTy
+    ldSup  T.StrT       = sup  Str    >>= genTy
+    ldSup  T.AtomT      = sup  Atom   >>= genTy
+    ldSup  T.NilT       = sup  Nil    >>= genTy
+    ldSup (T.TagT t)    = sup (Tag t) >>= genTy
 
     ldSup (T.ConsT a b) = do
-      tr  <- genTy =<< sup MT.Cons
+      tr  <- genTy =<< sup Cons
       crs <- mapM ldSup [a, b]
-      s   <- getSub tr MT.Cons
-      setSub tr MT.Cons s { children = crs }
+      s   <- getSub tr Cons
+      setSub tr Cons s { children = crs }
       return tr
 
     ldSup (T.ArrT as b) = do
-      let ctr = MT.Fn (length as)
+      let ctr = Fn (length as)
       tr   <- genTy =<< sub ctr
       atrs <- mapM ldSub as
       btr  <- ldSup b
@@ -57,22 +58,22 @@ loadTy ty = evalStateT (ldSup ty) H.empty
       return tr
 
     ldSub (T.VarT v)    = lookupVar v
-    ldSub  T.BoolT      = sub  MT.Bool   >>= genTy
-    ldSub  T.NumT       = sub  MT.Num    >>= genTy
-    ldSub  T.StrT       = sub  MT.Str    >>= genTy
-    ldSub  T.AtomT      = sub  MT.Atom   >>= genTy
-    ldSub  T.NilT       = sub  MT.Nil    >>= genTy
-    ldSub (T.TagT t)    = sub (MT.Tag t) >>= genTy
+    ldSub  T.BoolT      = sub  Bool   >>= genTy
+    ldSub  T.NumT       = sub  Num    >>= genTy
+    ldSub  T.StrT       = sub  Str    >>= genTy
+    ldSub  T.AtomT      = sub  Atom   >>= genTy
+    ldSub  T.NilT       = sub  Nil    >>= genTy
+    ldSub (T.TagT t)    = sub (Tag t) >>= genTy
 
     ldSub (T.ConsT a b) = do
-      tr  <- genTy =<< sub MT.Cons
+      tr  <- genTy =<< sub Cons
       crs <- mapM ldSub [a, b]
-      s   <- getSub tr MT.Cons
-      setSub tr MT.Cons s { children = crs }
+      s   <- getSub tr Cons
+      setSub tr Cons s { children = crs }
       return tr
 
     ldSub (T.ArrT as b) = do
-      let ctr = MT.Fn (length as)
+      let ctr = Fn (length as)
       tr   <- genTy =<< sub ctr
       atrs <- mapM ldSup as
       btr  <- ldSub b

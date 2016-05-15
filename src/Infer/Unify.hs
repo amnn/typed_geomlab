@@ -11,6 +11,7 @@ module Infer.Unify where
 
 import           Control.Monad.Except
 import           Control.Monad.ST.Class
+import           Data.Constructor
 import           Data.Flag
 import           Data.Function          (on)
 import qualified Data.HashMap.Strict    as H

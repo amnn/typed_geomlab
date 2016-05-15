@@ -10,24 +10,20 @@ type, and each variable is also annotated with levels, used for generalisation.
 module Data.Monad.Type where
 
 import           Control.Monad       ((>=>))
+import           Data.Constructor
 import           Data.Flag
-import           Data.Hashable
 import qualified Data.HashMap.Strict as H
 import           Data.STRef
-import           Data.Token          (Id)
-import           GHC.Generics        (Generic)
 
 type TyRef s = STRef s (Ty s)
 
--- | Constructors
-data Ctr = Bool | Num | Str | Nil | Cons | Fn !Int
-         | Tag Id | Atom
-         -- ^ Ordering is important, `Atom` appears after `Tag` so that the
-         -- latter is unified first.
-         | Any
-         -- ^ Similarly, `Any` must be unified last of all.
-           deriving (Eq, Ord, Generic)
+data FlagTree s = FT { caseArg :: TyRef s
+                     , arms    :: !(H.HashMap Ctr (FlagTree s))
+                     , interp  :: !Flag
+                     }
+                | FL { interp  :: Flag }
 
+-- | An individual sub-type in the Remy encoding
 data Sub s = Sub { flag     :: !Flag
                  , children :: [TyRef s]
                  }
@@ -50,31 +46,6 @@ data Ty s = Ty  { uid      :: !Int
                 }
           | Fwd (TyRef s)
             deriving Eq
-
-instance Hashable Ctr
-
-instance Show Ctr where
-  show  Bool   = "bool"
-  show  Num    = "num"
-  show  Str    = "str"
-  show  Nil    = "[]"
-  show  Cons   = "(:)"
-  show (Fn a)  = "(" ++ show a ++ ")->"
-  show (Tag t) = "#" ++ t
-  show  Atom   = "atom"
-  show  Any    = "any"
-
--- | Mapping from a constructor to its wildcard constructor.
-wildcard :: Ctr -> Maybe Ctr
-wildcard  Any    = Nothing
-wildcard (Tag _) = Just Atom
-wildcard  _      = Just Any
-
--- | How many child types each constructor requires
-arity :: Ctr -> Int
-arity  Cons    = 2
-arity (Fn aty) = aty + 1
-arity  _       = 0
 
 allChildren :: Maybe (H.HashMap Ctr (Sub s)) -> [TyRef s]
 allChildren = maybe [] (H.elems >=> children)

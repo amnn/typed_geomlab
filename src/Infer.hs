@@ -12,6 +12,7 @@ import           Control.Monad.Reader
 import           Control.Monad.ST
 import           Control.Monad.ST.Class
 import           Control.Monad.State
+import           Data.Constructor
 import           Data.Expr
 import           Data.Flag
 import qualified Data.HashMap.Strict    as H

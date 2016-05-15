@@ -11,6 +11,7 @@ module Infer.TypeFactory where
 import           Control.Applicative    ((<|>))
 import           Control.Monad.Reader
 import           Control.Monad.ST.Class
+import           Data.Constructor
 import           Data.Flag
 import qualified Data.HashMap.Strict    as H
 import           Data.Monad.DynArray
