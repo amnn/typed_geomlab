@@ -9,16 +9,19 @@ Generalisation of types to form type schemes, and instantiation (vice versa).
 module Infer.Generalise where
 
 import           Control.Monad.Except
+import           Control.Monad.Extra    (partitionM)
 import           Control.Monad.Reader
 import           Control.Monad.ST.Class
 import           Control.Monad.State
+import           Data.Constructor
 import           Data.HashMap.Strict    as H
 import           Data.Monad.State
 import           Data.Monad.Type
+import qualified Data.Set               as S
+import           Infer.FlagTree
 import           Infer.Levels
 import           Infer.Monad
 import           Infer.TypeFactory
-import Data.Constructor
 
 -- | Find all type references from lower scopes than the current one, and ensure
 -- that level adjustments have all been made for them. This is done before a
@@ -53,11 +56,13 @@ forceDelayedAdjustments = do
           adjustTop ts _tr
 
 -- | Generalisation involves universally quantifying variables that are scoped
--- strictly below the current level.
+-- strictly below the current level. After generalisation, if any non-general
+-- types are dependent upon a general type, such correlations are also removed.
 generalise :: MonadInfer m => TyRef (World m) -> m ()
 generalise tr = do
   forceDelayedAdjustments
   gen tr
+  decorrelateNonGenDeps tr
   where
     gen _ur = do
       _ur <- repr _ur
@@ -69,6 +74,24 @@ generalise tr = do
           afterMarking 0 _ur $ mapM_ gen (allChildren subs)
           unifyLevels _ur $ Gen
 
+    decorrelateNonGenDeps _ur = do
+      _ur <- repr _ur
+      gt@Ty {subs, uid, deps, newLevel} <- readIRef _ur
+      case newLevel of
+        Marked _    -> return ()
+        Set (Lvl _) -> return ()
+        Set  Gen    -> do
+          afterMarking 0 _ur $ mapM_ decorrelateNonGenDeps (allChildren subs)
+          (genDeps, nonGenDeps) <- partitionM (isGen . fst) deps
+          writeIRef _ur (gt { deps = genDeps})
+          forM_ nonGenDeps $ \(_tr, ctr) -> do
+            s   <- getSub _tr ctr
+            f'  <- decorrelate _tr (S.singleton uid) (flag s)
+            setSub _tr ctr s { flag = f' }
+
+    isGen ur = do
+      Ty {newLevel} <- readIRef =<< repr ur
+      return (newLevel == Set Gen)
 
 -- | A single entry in the instantiation lookaside map. It either contains a
 -- complete, instantiated copy of a previously general type, or a list of types
@@ -85,9 +108,10 @@ instantiate tRef = evalStateT (inst tRef) H.empty
       Ty {uid, subs, newLevel} <- readIRef =<< repr tr
       lookaside <- get
       case H.lookup uid lookaside of
-        Just (Done tr')      -> return tr'
-        Just (Waiting fwd _) -> do
+        Just (Done tr')         -> return tr'
+        Just (Waiting fwd wait) -> do
           nr <- newInst uid subs
+          addDeps wait nr
           writeIRef fwd (Fwd nr)
           return nr
 
@@ -124,7 +148,10 @@ instantiate tRef = evalStateT (inst tRef) H.empty
         Set  Gen    -> do
           lookaside <- get
           case H.lookup uid lookaside of
-            Just (Done cr')         -> return cr'
+            Just (Done cr')         -> do
+              addDeps [(nr, ctr)] cr'
+              return cr'
+
             Just (Waiting fwd wait) -> do
               modify (H.insert uid (Waiting fwd ((nr, ctr):wait)))
               return fwd

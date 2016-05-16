@@ -47,6 +47,22 @@ fresh = do
 freshSub :: MonadInferTop m => FlagTree (World m) -> Ctr  -> m (Sub (World m))
 freshSub flg ctr = Sub flg <$> replicateM (arity ctr) newVar
 
+-- | By inspecting the sub map of a (new) type, add its type reference as a
+-- dependant type to all of its flags' case arguments.
+registerDeps :: MonadInferTop m
+             => TyRef (World m)
+             -- ^ Reference of new type
+             -> Maybe (H.HashMap Ctr (Sub (World m)))
+             -- ^ Sub map
+             -> m ()
+registerDeps tr subs = mapM_ (H.traverseWithKey registerSub) subs
+  where
+    registerSub  ctr Sub {flag} = registerFlag ctr flag
+    registerFlag _   FL  {}     = return ()
+    registerFlag ctr FT  {caseArg, arms} = do
+      addDeps [(tr, ctr)] caseArg
+      mapM_ (registerFlag ctr) arms
+
 -- | Create a new type at the current level, from the structure provided.
 newTy :: MonadInferTop m
       => Maybe (H.HashMap Ctr (Sub (World m)))
@@ -58,11 +74,14 @@ newTy :: MonadInferTop m
 newTy subs = do
   lvl <- getCurrLvl
   uid <- fresh
-  newIRef $ Ty { uid      = uid
-               , subs     = subs
-               , newLevel = Set (Lvl lvl)
-               , oldLevel = Lvl lvl
-               }
+  nr  <- newIRef $ Ty { uid      = uid
+                      , subs     = subs
+                      , deps     = []
+                      , newLevel = Set (Lvl lvl)
+                      , oldLevel = Lvl lvl
+                      }
+  registerDeps nr subs
+  return nr
 
 -- | Create a new type at the generic level, from the structure provided.
 genTy :: MonadInferTop m
@@ -70,11 +89,14 @@ genTy :: MonadInferTop m
       -> m (TyRef (World m))
 genTy subs = do
   uid <- fresh
-  newIRef $ Ty { uid      = uid
-               , subs     = subs
-               , newLevel = Set Gen
-               , oldLevel = Gen
-               }
+  nr  <- newIRef $ Ty { uid      = uid
+                      , subs     = subs
+                      , deps     = []
+                      , newLevel = Set Gen
+                      , oldLevel = Gen
+                      }
+  registerDeps nr subs
+  return nr
 
 -- | Create a new variable at the current level.
 newVar :: MonadInferTop m

@@ -61,8 +61,8 @@ unify :: MonadInfer m
 unify _tr _ur = do
   [_tr, _ur] <- mapM repr [_tr, _ur]
   when (_tr /= _ur) $ do
-    Ty {subs = subT, newLevel = Set lt} <- readIRef _tr
-    Ty {subs = subU, newLevel = Set lu} <- readIRef _ur
+    Ty {subs = subT,               newLevel = Set lt} <- readIRef _tr
+    Ty {subs = subU, deps = depsU, newLevel = Set lu} <- readIRef _ur
     case (subT, subU) of
       (Nothing, _) -> _tr ~> _ur
       (_, Nothing) -> _ur ~> _tr
@@ -70,6 +70,7 @@ unify _tr _ur = do
         let ctrs = S.toList (frontier st su)
         subPairs <- mapM (subPair _tr _ur) ctrs
         _ur ~> _tr
+        addDeps depsU _tr
         updateLevel (lt `min` lu) _tr
         mapM_ (unifySub _tr) subPairs
   where

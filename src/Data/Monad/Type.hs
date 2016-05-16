@@ -42,6 +42,7 @@ data Marked a = Set a | Marked !Int deriving (Eq, Show)
 -- | Remy encoding of types
 data Ty s = Ty  { uid      :: !Int
                 , subs     :: !(Maybe (H.HashMap Ctr (Sub s)))
+                , deps     :: ![(TyRef s, Ctr)]
                 , newLevel :: !(Marked Level)
                 , oldLevel :: !Level
                 }

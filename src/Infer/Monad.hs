@@ -15,6 +15,7 @@ import           Control.Monad.Reader
 import           Control.Monad.ST
 import           Control.Monad.ST.Class
 import           Control.Monad.State
+import           Data.Constructor
 import           Data.Monad.DynArray
 import           Data.Monad.State
 import           Data.Monad.Type
@@ -90,6 +91,17 @@ repr tr = do
       writeIRef tr $ Fwd _pr
       return _pr
     _ -> return tr
+
+-- | Register additional dependant types.
+addDeps :: MonadInferTop m
+        => [(TyRef (World m), Ctr)]
+        -- ^ The dependant types
+        -> TyRef (World m)
+        -- ^ The type being dependent upon
+        -> m ()
+addDeps newDeps _tr = do
+  _tr <- repr _tr
+  modifyIRef _tr (\t@Ty {deps} -> t { deps = newDeps ++ deps})
 
 -- | Return the set of type uids, and a list of corresponding type references
 -- that are reachable from the given type reference.
