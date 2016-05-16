@@ -26,6 +26,7 @@ import           Data.Sugar
 import           Data.TyError
 import           Infer.Context
 import           Infer.Debug            (showTyRef)
+import           Infer.FlagTree
 import           Infer.Generalise
 import           Infer.Monad
 import           Infer.TypeFactory
@@ -102,6 +103,8 @@ typeOf gloDefs = check
         ltr <- pushLocal
         unify ltr =<< check a
         return ltr
+      (_, uids) <- reachable atr
+      decorrelateTy atr uids
       generalise atr
       btr <- check b
       popLocal
@@ -171,5 +174,7 @@ typeCheck ps = runST $ flip runReaderT undefined $ do
         etr <- flip typeOf e =<< get
         topCtx e $ unify evr etr
         return evr
+      (_, uids) <- reachable dtr
+      decorrelateTy dtr uids
       generalise dtr
       showTyRef dtr

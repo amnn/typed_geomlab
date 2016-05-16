@@ -98,3 +98,21 @@ decorrelate _tr uids f@FT {caseArg, arms} = do
     foldM (merge _tr) (FL dontCare) arms'
   else
     return f { arms = arms' }
+
+-- | Apply decorrelation to all flags in the given type.
+decorrelateTy :: MonadInferTop m
+              => TyRef (World m)
+              -- ^ Type owning all the flags.
+              -> S.Set Int
+              -- ^ Type uids to decorrelate w.r.t.
+              -> m ()
+
+decorrelateTy _tr uids = do
+  _tr         <- repr _tr
+  t@Ty {subs} <- readIRef _tr
+  subs'       <- mapM (mapM (decorrelateSub _tr)) subs
+  writeIRef _tr t { subs = subs' }
+  where
+    decorrelateSub _tr s@Sub {flag} = do
+      flag' <- decorrelate _tr uids flag
+      return s { flag = flag' }
