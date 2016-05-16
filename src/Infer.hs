@@ -22,6 +22,7 @@ import           Data.Monad.DynArray
 import           Data.Monad.State
 import           Data.Monad.Type
 import           Data.Patt
+import qualified Data.Set               as S
 import           Data.Sugar
 import           Data.TyError
 import           Infer.Context
@@ -85,6 +86,14 @@ typeOf gloDefs = check
       fr   <- newTy =<< sup ctr
       s    <- getSub fr ctr
       replicateM_ a popLocal
+
+      -- decorrelations between parameters
+      rtrs  <- mapM reachable ptrs
+      let rUids = S.unions (snd <$> rtrs)
+      forM_ rtrs $ \(trs, uids) -> do
+        let rUids' = rUids `S.difference` uids
+        forM_ trs $ \tr -> decorrelateTy tr rUids'
+
       setSub fr ctr s { children = etr:ptrs }
       return fr
 
