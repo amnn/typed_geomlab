@@ -91,15 +91,17 @@ repr tr = do
       return _pr
     _ -> return tr
 
--- | Return a list of all the type uids that are reachable from the given
--- type reference.
-reachable :: MonadInferTop m => TyRef (World m) -> m (S.Set Int)
-reachable tr = execStateT (go tr) S.empty
+-- | Return the set of type uids, and a list of corresponding type references
+-- that are reachable from the given type reference.
+reachable :: MonadInferTop m
+          => TyRef (World m)
+          -> m ([TyRef (World m)], S.Set Int)
+reachable tr = execStateT (go tr) ([], S.empty)
   where
     go _tr = do
       _tr            <- repr _tr
-      reached        <- get
+      (refs, uids)   <- get
       Ty {uid, subs} <- readIRef _tr
-      when (S.notMember uid reached) $ do
-        modify (S.insert uid)
+      when (S.notMember uid uids) $ do
+        put (_tr:refs, S.insert uid uids)
         mapM_ go (allChildren subs)
