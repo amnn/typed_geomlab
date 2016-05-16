@@ -333,7 +333,7 @@ anonFn lps lb = FnS <@> loc [FnArm "" <@> lps <*> reify "function body" lb <*> p
 -- Operator Associativity Parsing
 mkOpExpr :: OpTree (Located Sugar) -> Located Sugar
 mkOpExpr (Leaf e)   = e
-mkOpExpr (Op i l r) = apply (pure i) [mkOpExpr l, mkOpExpr r]
+mkOpExpr (Op i l r) = reify "function application" $ apply (pure i) [mkOpExpr l, mkOpExpr r]
 
 parseError :: Lexeme -> Alex a
 parseError l = alexError msg
