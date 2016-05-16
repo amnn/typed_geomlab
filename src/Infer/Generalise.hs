@@ -18,6 +18,7 @@ import           Data.Monad.Type
 import           Infer.Levels
 import           Infer.Monad
 import           Infer.TypeFactory
+import Data.Constructor
 
 -- | Find all type references from lower scopes than the current one, and ensure
 -- that level adjustments have all been made for them. This is done before a
@@ -68,6 +69,12 @@ generalise tr = do
           afterMarking 0 _ur $ mapM_ gen (allChildren subs)
           unifyLevels _ur $ Gen
 
+
+-- | A single entry in the instantiation lookaside map. It either contains a
+-- complete, instantiated copy of a previously general type, or a list of types
+-- that will depend upon the instantiation.
+data InstRecord s = Done (TyRef s) | Waiting (TyRef s) [(TyRef s, Ctr)]
+
 -- | Replace universally quantified variables in a (possibly) general type with
 -- fresh type variables at the current level: Every instance of a generalised
 -- type is new, and unification with one instance should not affect another.
@@ -76,19 +83,53 @@ instantiate tRef = evalStateT (inst tRef) H.empty
   where
     inst tr = do
       Ty {uid, subs, newLevel} <- readIRef =<< repr tr
-      subst <- get
-      case H.lookup uid subst of
-        Just tr' -> return tr'
-        Nothing
-          | Set Gen <- newLevel -> do
-          nr <- newTy (Just H.empty)
-          put (H.insert uid nr subst)
-          nSubs <- mapM (mapM instSub) subs
-          modifyIRef nr $ \t -> t {subs = nSubs}
+      lookaside <- get
+      case H.lookup uid lookaside of
+        Just (Done tr')      -> return tr'
+        Just (Waiting fwd _) -> do
+          nr <- newInst uid subs
+          writeIRef fwd (Fwd nr)
           return nr
-          | Marked _ <- newLevel -> error "instantiate: Marked level!"
+
+        Nothing | Set Gen  <- newLevel -> newInst uid subs
+                | Marked _ <- newLevel -> error "instantiate: Marked level!"
+
         _ -> return tr
 
-    instSub s@Sub {children} = do
+    newInst uid subs = do
+      nr        <- newTy (Just H.empty)
+      lookaside <- get
+      put (H.insert uid (Done nr) lookaside)
+      subs' <- mapM (H.traverseWithKey (instSub nr)) subs
+      modifyIRef nr $ \t -> t {subs = subs'}
+      return nr
+
+    instSub nr ctr s@Sub {flag, children} = do
+      f'  <- instFlag nr ctr flag
       cs' <- mapM inst children
-      return s { children = cs' }
+      return s { flag = f', children = cs' }
+
+    instFlag _  _   f@FL {}              = return f
+    instFlag nr ctr f@FT {caseArg, arms} = do
+      arms' <- mapM (instFlag nr ctr) arms
+      cr'   <- registerDependantInst caseArg nr ctr
+      return f { caseArg = cr', arms = arms' }
+
+    registerDependantInst _cr nr ctr = do
+      _cr                <- repr _cr
+      Ty {uid, newLevel} <- readIRef _cr
+      case newLevel of
+        Marked _    -> error "instantiate: Marked level!"
+        Set (Lvl _) -> return _cr
+        Set  Gen    -> do
+          lookaside <- get
+          case H.lookup uid lookaside of
+            Just (Done cr')         -> return cr'
+            Just (Waiting fwd wait) -> do
+              modify (H.insert uid (Waiting fwd ((nr, ctr):wait)))
+              return fwd
+
+            Nothing -> do
+              fwd <- newVar
+              modify (H.insert uid (Waiting fwd [(nr, ctr)]))
+              return fwd
