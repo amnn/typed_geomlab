@@ -14,10 +14,12 @@ import           Control.Monad.Reader
 import           Control.Monad.ST.Class
 import           Control.Monad.State
 import           Data.Constructor
+import           Data.Flag
 import           Data.HashMap.Strict    as H
 import           Data.Monad.State
 import           Data.Monad.Type
 import qualified Data.Set               as S
+import           Infer.Context
 import           Infer.FlagTree
 import           Infer.Levels
 import           Infer.Monad
@@ -129,9 +131,11 @@ instantiate tRef = evalStateT (inst tRef) H.empty
       return nr
 
     instSub nr ctr s@Sub {flag, children} = do
-      f'  <- instFlag nr ctr flag
+      fi  <- instFlag nr ctr flag
+      ctx <- contextualise dontCare
+      fi' <- merge nr ctx fi
       cs' <- mapM inst children
-      return s { flag = f', children = cs' }
+      return s { flag = fi', children = cs' }
 
     instFlag _  _   f@FL {}              = return f
     instFlag nr ctr f@FT {caseArg, arms} = do
